@@ -3146,7 +3146,16 @@ async function handleCreateUser(db, body: any): Promise<any> {
 // ============================================================
 async function handleUpdateUser(db, entityId: string, body: any): Promise<any> {
   await requirePermission(db, 'users.manage')
+  const authUser = await requireUser(db)
   const { name, email, phone, role, permissions, active, pin, password } = body
+
+  // An ADMIN cannot change their own role or permission set. The UI also
+  // disables the role control, but this server-side guard is authoritative
+  // so a direct API call cannot demote/promote or alter the current admin's
+  // permissions.
+  if (authUser.id === entityId && authUser.role === 'ADMIN' && (role !== undefined || permissions !== undefined)) {
+    throw new Error('لا يمكن لمدير النظام تغيير دوره أو صلاحياته الذاتية')
+  }
 
   // Role changes reset to the central defaults unless the UI explicitly
   // supplies a custom permissions array. This prevents a role update from
