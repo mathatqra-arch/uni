@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Uni Kasher Key Manager",
+  "version": "1.0.0",
+  "identifier": "com.unikasher.keymanager",
+  "build": {
+    "frontendDist": "./ui"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "مدير مفاتيح Uni Kasher",
+        "width": 1180,
+        "height": 860,
+        "minWidth": 900,
+        "minHeight": 640,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/icon-32x32.png",
+      "icons/icon-128x128.png",
+      "icons/icon-256x256.png",
+      "icons/icon-128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "copyright": "© 2026 Uni Kasher",
+    "category": "DeveloperTool",
+    "shortDescription": "Uni Kasher Key Manager",
+    "longDescription": "Internal tool: generate and register Uni Kasher license keys (owner only)."
+  }
+}

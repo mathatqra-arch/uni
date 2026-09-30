@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>تقرير المقارنة المرجعي — بيانات شهرين (نظيفة)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI', Tahoma, sans-serif; background:#F5EFE2; color:#160029; padding:2rem 1rem; line-height:1.7; }
+  .wrap { max-width:1000px; margin:0 auto; }
+  .top { height:4px; border-radius:999px; background:linear-gradient(90deg,#D44D5C,#E8E5A4,#772344); margin-bottom:1.5rem; }
+  h1 { font-size:1.55rem; font-weight:800; }
+  .sub { color:#4d3d53; font-size:.9rem; margin-bottom:1.5rem; }
+  .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:.8rem; margin-bottom:1.5rem; }
+  .m { background:#fffdf8; border:1px solid #e2d5d9; border-radius:1rem; padding:1rem; text-align:center; }
+  .m b { display:block; font-size:1.25rem; color:#772344; }
+  .m span { font-size:.72rem; color:#4d3d53; }
+  .card { background:#fffdf8; border:1px solid #e2d5d9; border-radius:1.15rem; padding:1.3rem 1.5rem; margin-bottom:1rem; box-shadow:0 10px 32px -24px rgba(22,0,41,.4); }
+  .card h2 { font-size:1rem; font-weight:800; margin-bottom:.7rem; color:#772344; }
+  table { width:100%; border-collapse:collapse; font-size:.86rem; }
+  th { background:rgba(232,229,164,.35); padding:.55rem .7rem; text-align:right; border-bottom:2px solid #772344; white-space:nowrap; }
+  td { padding:.5rem .7rem; border-bottom:1px solid #eee0e5; }
+  tr:last-child td { border-bottom:0; }
+  .pos { color:#21644b; font-weight:700; }
+  .neg { color:#9b243a; font-weight:700; }
+  .big { font-weight:800; }
+  .note { background:rgba(232,229,164,.25); border:1px dashed #772344; border-radius:.8rem; padding:.8rem 1rem; font-size:.82rem; margin-top:1rem; }
+  code { font-family:Consolas,monospace; background:rgba(232,229,164,.3); padding:.05rem .3rem; border-radius:.3rem; font-size:.78rem; }
+  footer { text-align:center; color:#4d3d53; font-size:.75rem; margin-top:1.2rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"></div>
+  <h1>تقرير المقارنة المرجعي — بيانات حقيقية نظيفة</h1>
+  <p class="sub">الفترة: 1 أغسطس → 13 سبتمبر 2026 · متجر مستحضرات تجميل · 18 منتج · 6 عملاء · 3 موردين · جلسة خزنة يومية (افتتاح 500 ج.م + إغلاق) — الأرقام محسوبة مباشرة من قاعدة البيانات.</p>
+
+  <div class="metrics">
+    <div class="m"><b>382</b><span>فاتورة مبيعات</span></div>
+    <div class="m"><b>251,108</b><span>المبيعات بالضريبة (ج.م)</span></div>
+    <div class="m"><b>117,003</b><span>مجمل الربح (ج.م)</span></div>
+    <div class="m"><b>99,158</b><span>صافي الربح بعد المصروفات</span></div>
+    <div class="m"><b>158,032</b><span>المشتريات (ج.م)</span></div>
+    <div class="m"><b>7</b><span>مرتجعات (1,055 ج.م)</span></div>
+  </div>
+
+  <div class="card">
+    <h2>الملخص المالي — شهر بشهر</h2>
+    <table>
+      <tr><th>البند</th><th>أغسطس 2026 (31 يوم)</th><th>سبتمبر 2026 (13 يوم)</th><th>الإجمالي</th></tr>
+      <tr><td>عدد الفواتير</td><td>287</td><td>95</td><td class="big">382</td></tr>
+      <tr><td>صافي المبيعات (قبل الضريبة)</td><td>179,007.00</td><td>41,263.00</td><td class="big">220,270.00</td></tr>
+      <tr><td>ضريبة القيمة المضافة 14%</td><td>25,060.98</td><td>5,776.82</td><td>30,837.80</td></tr>
+      <tr><td>إجمالي الفواتير (بالضريبة)</td><td>204,067.98</td><td>47,039.82</td><td class="big">251,107.80</td></tr>
+      <tr><td>تكلفة البضاعة المباعة COGS</td><td class="neg">107,873.00</td><td class="neg">25,177.00</td><td class="neg">133,050.00</td></tr>
+      <tr><td>المرتجعات</td><td class="neg">1,040.71 (6)</td><td class="neg">14.59 (1)</td><td class="neg">1,055.30 (7)</td></tr>
+      <tr><td><b>مجمل الربح</b> (مبيعات − مرتجعات − COGS)</td><td class="pos">95,154.27</td><td class="pos">21,848.23</td><td class="pos big">117,002.50</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>المصروفات حسب البند</h2>
+    <table>
+      <tr><th>البند</th><th>عدد العمليات</th><th>الإجمالي (ج.م)</th></tr>
+      <tr><td>إيجار</td><td>2</td><td>12,000.00</td></tr><tr><td>كهرباء</td><td>2</td><td>1,700.00</td></tr><tr><td>تسويق وإعلان</td><td>3</td><td>1,500.00</td></tr><tr><td>تغليف ومستهلكات</td><td>14</td><td>1,325.00</td></tr><tr><td>نقل ومواصلات</td><td>44</td><td>1,320.00</td></tr>
+      <tr><td class='big'>الإجمالي</td><td class='big'>65</td><td class='big'>17,845.00</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>المشتريات</h2>
+    <table>
+      <tr><th>الشهر</th><th>عدد الفواتير</th><th>الإجمالي (ج.م)</th></tr>
+      <tr><td>31 يوليو (افتتاحية)</td><td>1</td><td>85,471.50</td></tr>
+      <tr><td>أغسطس</td><td>10</td><td>50,051.70</td></tr>
+      <tr><td>سبتمبر</td><td>4</td><td>22,509.30</td></tr>
+      <tr><td class="big">الإجمالي</td><td class="big">15</td><td class="big">158,032.50</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>الخزنة (44 جلسة يومية)</h2>
+    <table>
+      <tr><th>البند</th><th>القيمة</th></tr>
+      <tr><td>جلسات (افتتاح 09:00 ← إغلاق 23:00)</td><td>44 جلسة مكتملة</td></tr>
+      <tr><td>مجموع أرصدة الافتتاح</td><td>22,000.00 (500 × 44 يوم)</td></tr>
+      <tr><td>مجموع أرصدة الإغلاق الفعلية</td><td>174,499.28</td></tr>
+      <tr><td>حركات كل جلسة</td><td>افتتاح + تحصيل نقدي − مصروفات نقدية − مرتجعات = إغلاق</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>الأنماط الثابتة للتحقق السريع</h2>
+    <table>
+      <tr><th>النمط</th><th>القيمة المتوقعة</th></tr>
+      <tr><td>فواتير كل يوم (اث→أحد)</td><td>6 / 8 / 5 / 9 / 11 / 14 / 16 — ذروة نهاية الأسبوع</td></tr>
+      <tr><td>نسبة الضريبة</td><td>14% بالضبط من صافي كل فاتورة</td></tr>
+      <tr><td>هامش مجمل الربح</td><td>≈ 47% من صافي المبيعات (كل منتج هامشه ثابت)</td></tr>
+      <tr><td>مصروف الإيجار</td><td>6,000 ج.م مرة واحدة (1 أغسطس)</td></tr>
+      <tr><td>مصروف الكهرباء</td><td>850 ج.م يوم 5 من كل شهر</td></tr>
+      <tr><td>مواصلات يومية</td><td>30 ج.م كل يوم بلا استثناء</td></tr>
+      <tr><td>مخزون سالب</td><td>صفر — كل حركة مبيعات مقفولة على الرصيد المتاح</td></tr>
+      <tr><td>أرصدة المنتجات النهائية</td><td>كلها موجبة ومحسوبة من حركات حقيقية</td></tr>
+    </table>
+  </div>
+
+  <div class="note">
+    <b>طريقة المقارنة:</b> افتح <code>التقارير</code> واختار الفترة <code>2026-08-01</code> → <code>2026-09-13</code>.
+    كل رقم هنا مقروء من نفس جداول SQLite اللي بيقرأ منها التقرير — أي اختلاف يعني خطأ حساب في التقرير.
+    سلامة القاعدة: <code>PRAGMA integrity_check = ok</code> · صفر سجلات يتيمة · صفر مخزون سالب.
+  </div>
+
+  <footer>Uni Kasher 2.0.10 — بيانات اختبار واقعية للمقارنة · August–September 2026</footer>
+</div>
+</body>
+</html>

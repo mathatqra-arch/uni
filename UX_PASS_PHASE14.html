@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Uni Kasher 2.0.10 — تقرير UX Phase 14</title>
+<style>
+  :root { --cream:#F5EFE2; --yellow:#E8E5A4; --coral:#D44D5C; --burgundy:#772344; --plum:#160029; --ink-muted:#4d3d53; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI', Tahoma, sans-serif; background:var(--cream); color:var(--plum); line-height:1.7; padding:2rem 1rem; }
+  .wrap { max-width:900px; margin:0 auto; }
+  .topline { height:4px; border-radius:999px; background:linear-gradient(90deg,var(--coral),var(--yellow),var(--burgundy)); margin-bottom:1.5rem; }
+  h1 { font-size:1.7rem; font-weight:800; letter-spacing:-.02em; }
+  .sub { color:var(--ink-muted); font-size:.9rem; margin-top:.3rem; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.75rem; margin:1.5rem 0; }
+  .metric { background:#fffdf8; border:1px solid #e2d5d9; border-radius:1rem; padding:1rem; text-align:center; }
+  .metric b { display:block; font-size:1.35rem; color:var(--burgundy); }
+  .metric span { font-size:.75rem; color:var(--ink-muted); }
+  .card { background:#fffdf8; border:1px solid #e2d5d9; border-radius:1.15rem; padding:1.25rem 1.4rem; margin-bottom:1rem; box-shadow:0 10px 32px -24px rgba(22,0,41,.4); }
+  .card h2 { font-size:1.02rem; font-weight:800; margin-bottom:.5rem; display:flex; align-items:center; gap:.5rem; }
+  .num { display:inline-grid; place-items:center; width:1.7rem; height:1.7rem; border-radius:.6rem; background:linear-gradient(145deg,var(--coral),var(--burgundy)); color:var(--cream); font-size:.8rem; font-weight:800; flex:none; }
+  .card p, .card li { font-size:.88rem; color:#33233a; }
+  .card ul { padding-right:1.2rem; }
+  .card li { margin-bottom:.3rem; }
+  table { width:100%; border-collapse:collapse; font-size:.85rem; margin-top:.6rem; }
+  th { background:rgba(232,229,164,.35); text-align:right; padding:.55rem .7rem; border-bottom:2px solid var(--burgundy); }
+  td { padding:.5rem .7rem; border-bottom:1px solid #eee0e5; vertical-align:top; }
+  tr:last-child td { border-bottom:0; }
+  code { font-family:Consolas,monospace; font-size:.78rem; background:rgba(232,229,164,.3); padding:.1rem .35rem; border-radius:.35rem; direction:ltr; display:inline-block; }
+  .pill { display:inline-flex; align-items:center; gap:.3rem; background:rgba(33,100,75,.12); color:#21644b; border-radius:999px; padding:.15rem .7rem; font-size:.75rem; font-weight:700; }
+  footer { text-align:center; color:var(--ink-muted); font-size:.78rem; margin-top:1.5rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topline"></div>
+  <h1>Uni Kasher 2.0.10 — UI/UX Phase 14</h1>
+  <p class="sub">توحيد وتلميع تجربة الاستخدام عبر كل الشاشات — بدون أي تغيير في منطق الأعمال أو SQLite أو عقود API أو الترخيص.</p>
+
+  <div class="grid">
+    <div class="metric"><b>0</b><span>أخطاء TypeScript</span></div>
+    <div class="metric"><b>16/16</b><span>بوابات UI/UX PASS</span></div>
+    <div class="metric"><b>75/75</b><span>اختبارات ناجحة</span></div>
+    <div class="metric"><b>12.2s</b><span>بناء كامل ✓</span></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">1</span> نهاية حقبة window.prompt / confirm</h2>
+    <p>آخر بقايا واجهة غير ماركة في الإعدادات (النسخ الاحتياطي والاستعادة) استُبدلت بنوافذ Dialog/AlertDialog ماركة بالكامل: تحقق فوري من كلمة المرور، معاينة دمج قبل التنفيذ، ورسائل خطأ داخل التصميم.</p>
+    <table>
+      <tr><th>قبل</th><th>بعد</th></tr>
+      <tr><td><code>window.prompt</code> ×2 لإنشاء نسخة</td><td>Dialog بحقلَي كلمة مرور + تأكيد مع <code>aria-invalid</code> وتحقق فوري</td></tr>
+      <tr><td><code>window.prompt</code> لفك التشفير</td><td>مسار مرحلي: اختيار ملف → كلمة مرور → تحقق صريح</td></tr>
+      <tr><td><code>window.confirm</code> بنص طويل</td><td>AlertDialog مارك بملخص الدمج وتأكيد «لن تُحذف بياناتك»</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">2</span> Page Shell موحّد في 16 وحدة</h2>
+    <p>كلاس <code>module-page</code> كان على 5 وحدات فقط؛ أُضيف للمبيعات والموظفين وسجل العمليات والولاء والمشتريات والمصروفات والتقارير والحسابات العامة والإعدادات ولوحة مدير المنصة — حركة دخول متدرجة وإيقاع صفحة موحّد في كل التطبيق، مع قاعدة طباعة A4 مخصصة للتقارير.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">3</span> Empty States إرشادية</h2>
+    <p>«لا توجد بيانات» صارت ترشد للخطوة التالية بدل طريق مسدود: <b>المبيعات</b> (وسّع الفلتر / F2 لنقطة البيع)، <b>الموظفون</b> (أضف أول موظف)، <b>سجل العمليات</b> (وسّع التاريخ أو صفّي أقل).</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">4</span> Skeletons وتوستات ماركة</h2>
+    <ul>
+      <li>Skeleton بنظام shimmer الموحد بلون كريمي/بروقمري دافئ بدل الرمادي الباهت.</li>
+      <li>الـ Toaster انتقل لـ <code>bottom-left</code> (بداية القراءة في RTL) مع <code>dir="rtl"</code> وحواف مستديرة متسقة.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">5</span> POS: اختصارات على المكشوف</h2>
+    <ul>
+      <li>تلميح <code>Enter — تنفيذ</code> داخل نوافذ الدفع والخصم (الكاشير يتعلم الاختصار من مكانه).</li>
+      <li>وصف توضيحي لنوافذ العميل («اختياري») والفواتير المعلقة («محفوظة على الجهاز»).</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">6</span> تلميع التفاصيل</h2>
+    <ul>
+      <li>بدون وميض ثيم عند الإقلاع — سكربت يطبّق الوضع المظلم قبل أول رسم.</li>
+      <li>سكروالبارات بألوان الهوية (بروقمري/كريمي) فاتح ومظلم.</li>
+      <li>عنوان الوحدة في الشريط العلوي يظهر كامل عند المرور عليه.</li>
+      <li>Focus ring كريمي واضح داخل الشريط الجانبي البروقمري الداكن.</li>
+      <li>أناتومي نوافذ موحّد (تباعد رأس/جسم/تذييل + حد 28rem للتأكيد).</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">✓</span> التحقق (تشغيل فعلي)</h2>
+    <p>
+      <span class="pill">tsc: 0 أخطاء</span>
+      <span class="pill">eslint: 0 أخطاء</span>
+      <span class="pill">16/16 بوابات PASS</span>
+      <span class="pill">vitest 75/75</span>
+      <span class="pill">build ✓ 12.22s</span>
+    </p>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">★</span> Phase 15 — حضور ماركة جريء (بناءً على طلب تغيير ملموس)</h2>
+    <ul>
+      <li>شاشتا الترخيص وتسجيل الدخول: خلفية بروقمري داكنة سينمائية بهالات كورال/كريمي، كارت كريمي عائم بظل عميق، ولوجو متوهج.</li>
+      <li>كل الأزرار الأساسية في التطبيق: تدرج ماركة (كورال ← بروقمري) بظل ملوّن ورفعة hover.</li>
+      <li>زر «نقطة البيع» السريع في الشريط العلوي مع اختصار F2 — أقصر طريق للكاشير.</li>
+    </ul>
+    <p style="margin-top:.5rem"><span class="pill">tsc 0</span> <span class="pill">بوابات PASS</span> <span class="pill">vitest 75/75</span> <span class="pill">build ✓</span> <span class="pill">HMR وصل</span></p>
+  </div>
+
+  <footer>Uni Kasher — UX Pass Phase 14 · طبقة بصرية فقط، منطق الأعمال لم يُمس</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مدير مفاتيح Uni Kasher</title>
+<style>
+:root{--cream:#F5EFE2;--yellow:#E8E5A4;--coral:#D44D5C;--burgundy:#772344;--plum:#160029;--ink2:#4d3d53;--card:#fffdf8}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,sans-serif;background:radial-gradient(1100px 600px at 85% -10%,rgba(212,77,92,.30),transparent 60%),radial-gradient(900px 500px at -10% 110%,rgba(119,35,68,.45),transparent 55%),var(--plum);color:#F5EFE2;height:100vh;overflow:hidden;display:flex}
+/* ── Sidebar ── */
+.sidebar{width:250px;flex:0 0 auto;background:linear-gradient(180deg,#1d0621,#160029);border-inline-end:1px solid rgba(245,239,226,.10);display:flex;flex-direction:column;padding:1.1rem .8rem}
+.brand{display:flex;align-items:center;gap:.65rem;margin-bottom:1.3rem;padding:.2rem .3rem}
+.brand .logo{width:2.5rem;height:2.5rem;border-radius:.85rem;background:var(--cream);display:grid;place-items:center;box-shadow:0 16px 40px -16px rgba(212,77,92,.75);overflow:hidden}
+.brand .logo img{width:100%;height:100%;object-fit:cover}
+.brand b{font-size:1.02rem;color:var(--cream);line-height:1.3}
+.brand small{display:block;color:rgba(245,239,226,.55);font-size:.68rem;font-weight:600}
+.nav{display:flex;flex-direction:column;gap:.25rem;flex:1}
+.nav-item{display:flex;align-items:center;gap:.65rem;padding:.62rem .8rem;border-radius:.8rem;font-size:.88rem;font-weight:700;color:rgba(245,239,226,.78);cursor:pointer;border:0;background:transparent;font-family:inherit;text-align:right;transition:background .15s ease,color .15s ease}
+.nav-item:hover{background:rgba(245,239,226,.08);color:#fff}
+.nav-item.active{background:linear-gradient(135deg,var(--coral),var(--burgundy));color:#fff;box-shadow:0 10px 24px -12px rgba(212,77,92,.7)}
+.nav-item .ni{width:1.35rem;text-align:center;font-size:1rem}
+.nav-footer{border-top:1px solid rgba(245,239,226,.10);padding-top:.8rem;margin-top:.8rem}
+.fp{font-size:.62rem;color:rgba(245,239,226,.45);word-break:break-all;direction:ltr;text-align:left;font-family:Consolas,monospace}
+/* ── Main ── */
+.main{flex:1;min-width:0;overflow-y:auto;padding:1.5rem 1.6rem}
+.page{display:none;animation:fadein .22s ease}
+.page.active{display:block}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+h1{font-size:1.35rem;font-weight:800;color:var(--cream);margin-bottom:.25rem}
+.psub{color:rgba(245,239,226,.6);font-size:.82rem;margin-bottom:1.2rem}
+.card{background:var(--card);color:var(--plum);border:1px solid rgba(245,239,226,.16);border-radius:1.15rem;padding:1.3rem 1.4rem;margin-bottom:1.1rem;box-shadow:0 30px 70px -35px rgba(0,0,0,.7)}
+.card h2{font-size:1.02rem;font-weight:800;color:var(--burgundy);margin-bottom:.9rem;display:flex;align-items:center;gap:.5rem}
+.card h2 .ic{display:inline-grid;place-items:center;width:1.7rem;height:1.7rem;border-radius:.6rem;background:linear-gradient(145deg,var(--coral),var(--burgundy));color:var(--cream);font-size:.8rem}
+label{display:block;font-size:.78rem;font-weight:700;margin-bottom:.3rem;color:#534360}
+input,select,textarea{width:100%;padding:.55rem .8rem;border:1px solid #ddd0d6;border-radius:.7rem;font-family:inherit;font-size:.88rem;background:#fff;color:var(--plum)}
+input:focus,select:focus{outline:2px solid var(--coral);outline-offset:1px;border-color:var(--coral)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.85rem}
+.row{display:flex;gap:.8rem;flex-wrap:wrap;align-items:flex-end}
+.btn{background:linear-gradient(135deg,var(--coral),var(--burgundy));color:#F5EFE2;border:0;border-radius:.8rem;padding:.68rem 1.6rem;font-weight:800;font-size:.92rem;cursor:pointer;font-family:inherit;box-shadow:0 12px 26px -14px rgba(212,77,92,.8);transition:transform .15s ease,opacity .15s ease}
+.btn:hover{transform:translateY(-1px);opacity:.94}
+.btn.secondary{background:#fff;color:var(--burgundy);border:1.5px solid var(--burgundy);box-shadow:none}
+.btn.ghost{background:rgba(245,239,226,.14);color:var(--cream);border:1px solid rgba(245,239,226,.3);box-shadow:none}
+.btn.danger{background:#fff;color:#9b243a;border:1.5px solid #9b243a;box-shadow:none}
+.result{margin-top:1.1rem;padding:1.1rem;border-radius:.9rem;background:rgba(232,229,164,.28);border:1.5px dashed var(--burgundy);display:none}
+.result .code{font-family:Consolas,monospace;font-size:.76rem;direction:ltr;text-align:left;word-break:break-all;background:#fff;padding:.75rem;border-radius:.6rem;margin:.5rem 0;user-select:all;border:1px solid #e8dcc2}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+th{background:rgba(232,229,164,.45);padding:.5rem .6rem;text-align:right;border-bottom:2px solid var(--burgundy);white-space:nowrap;color:var(--plum)}
+td{padding:.45rem .6rem;border-bottom:1px solid #f0e5ea;color:#33233a}
+tr:hover td{background:rgba(232,229,164,.16)}
+.badge{display:inline-block;padding:.12rem .6rem;border-radius:99px;font-size:.7rem;font-weight:800}
+.b-active{background:rgba(33,100,75,.14);color:#21644b}
+.b-revoked{background:rgba(155,36,58,.14);color:#9b243a}
+.b-trial{background:rgba(90,80,160,.14);color:#4a4494}
+.b-full{background:rgba(33,100,75,.14);color:#21644b}
+.code-mini{font-family:Consolas,monospace;font-size:.66rem;direction:ltr;text-align:left;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;cursor:pointer;color:var(--burgundy)}
+.toolbar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.9rem;align-items:center}
+.search{max-width:300px}
+.empty{color:var(--ink2);text-align:center;padding:1.4rem;font-size:.85rem}
+.toast{position:fixed;bottom:1.2rem;left:1.2rem;background:var(--cream);color:var(--plum);padding:.65rem 1.3rem;border-radius:.8rem;font-size:.86rem;font-weight:700;display:none;z-index:99;box-shadow:0 14px 34px -14px rgba(0,0,0,.6)}
+.info{font-size:.74rem;color:var(--ink2);margin-top:.45rem}
+.copy-btn{background:#fff;border:1px solid #ddd;border-radius:.45rem;padding:.15rem .5rem;font-size:.7rem;cursor:pointer;font-family:inherit}
+.copy-btn:hover{border-color:var(--coral);color:var(--coral)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.7rem;margin-bottom:1.1rem}
+.stat{background:rgba(245,239,226,.10);border:1px solid rgba(245,239,226,.16);border-radius:.9rem;padding:.75rem;text-align:center}
+.stat b{display:block;font-size:1.25rem;color:var(--yellow)}
+.stat span{font-size:.7rem;color:rgba(245,239,226,.65)}
+.tbl-wrap{overflow-x:auto}
+.switch{position:relative;width:2.6rem;height:1.45rem;display:inline-block}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:99px;transition:.2s}
+.slider::before{content:'';position:absolute;height:1.1rem;width:1.1rem;right:.18rem;bottom:.18rem;background:#fff;border-radius:50%;transition:.2s}
+.switch input:checked+.slider{background:var(--coral)}
+.switch input:checked+.slider::before{transform:translateX(-1.15rem)}
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:.7rem 0;border-bottom:1px solid #f0e5ea}
+.set-row:last-child{border-bottom:0}
+.set-row .info{margin-top:0}
+.danger-zone{border:1.5px solid rgba(155,36,58,.4)}
+.danger-zone h2{color:#9b243a}
+@media(max-width:900px){.sidebar{width:70px}.brand b,.brand small,.nav-item span.lbl{display:none}.nav-item{justify-content:center}.main{padding:1rem}.fp{display:none}}
+</style></head><body>
+<nav class="sidebar">
+  <div class="brand">
+    <div class="logo"><img src="icons/icon-256x256.png" alt="UK"></div>
+    <div><b>مدير المفاتيح</b><small>Uni Kasher</small></div>
+  </div>
+  <div class="nav">
+    <button class="nav-item active" data-page="generate"><span class="ni">⚡</span><span class="lbl">توليد مفتاح</span></button>
+    <button class="nav-item" data-page="registry"><span class="ni">🗂</span><span class="lbl">سجل المفاتيح</span></button>
+    <button class="nav-item" data-page="devices"><span class="ni">💻</span><span class="lbl">الأجهزة</span></button>
+    <button class="nav-item" data-page="settings"><span class="ni">⚙</span><span class="lbl">الإعدادات</span></button>
+  </div>
+  <div class="nav-footer">
+    <div class="fp" id="fp">…</div>
+  </div>
+</nav>
+
+<main class="main">
+<!-- ═══════════ PAGE: GENERATE ═══════════ -->
+<section class="page active" id="page-generate">
+  <h1>توليد مفتاح جديد</h1>
+  <p class="psub">وقّع مفتاح ترخيص Ed25519 متوافق مع تفعيل البرنامج بدون إنترنت</p>
+  <div class="stats">
+    <div class="stat"><b id="s-total">0</b><span>إجمالي المفاتيح</span></div>
+    <div class="stat"><b id="s-trial">0</b><span>مفاتيح تجربة</span></div>
+    <div class="stat"><b id="s-full">0</b><span>اشتراكات</span></div>
+    <div class="stat"><b id="s-dev">0</b><span>أجهزة مسجلة</span></div>
+  </div>
+  <div class="card">
+    <h2><span class="ic">⚡</span> بيانات المفتاح</h2>
+    <div class="grid">
+      <div><label>اسم العميل / الجهة *</label><input id="customer" placeholder="مثال: سوبر ماركت النور"></div>
+      <div><label>رقم الهاتف</label><input id="phone" placeholder="اختياري"></div>
+      <div><label>نوع الترخيص</label>
+        <select id="ltype"><option value="TRIAL">تجربة</option><option value="FULL">اشتراك كامل</option></select>
+      </div>
+      <div><label>المدة</label>
+        <select id="dur">
+          <option value="5m">5 دقائق (اختبار سريع)</option>
+          <option value="15m">15 دقيقة</option>
+          <option value="30m">30 دقيقة</option>
+          <option value="1h">ساعة</option><option value="6h">6 ساعات</option>
+          <option value="1d">يوم</option><option value="3d">3 أيام</option>
+          <option value="7d" selected>أسبوع</option><option value="14d">أسبوعان</option>
+          <option value="30d">شهر</option><option value="60d">شهران</option>
+          <option value="90d">3 أشهر</option><option value="6m">6 أشهر</option>
+          <option value="1y">سنة</option><option value="lifetime">مدى الحياة</option>
+        </select>
+      </div>
+      <div><label>Device ID (ربط بجهاز)</label><input id="device" placeholder="من شاشة التفعيل — فارغ = غير مربوط"></div>
+      <div><label>يبدأ بعد (أيام)</label><input id="startdays" type="number" min="0" value="0"></div>
+      <div style="grid-column:1/-1"><label>ملاحظة</label><input id="note" placeholder="اختياري — دفعة، تذكرة دعم..."></div>
+    </div>
+    <div style="margin-top:1rem;display:flex;gap:.6rem;flex-wrap:wrap">
+      <button class="btn" onclick="gen()">⚡ توليد المفتاح</button>
+      <button class="btn ghost" onclick="fillFromLastDevice()">استخدام آخر جهاز مسجل</button>
+    </div>
+    <div id="result" class="result">
+      <b>المفتاح الجديد — انسخه وأرسله للعميل:</b>
+      <div class="code" id="newcode"></div>
+      <button class="copy-btn" onclick="copyNew()">📋 نسخ المفتاح</button>
+      <span class="info" id="newmeta"></span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ PAGE: REGISTRY ═══════════ -->
+<section class="page" id="page-registry">
+  <h1>سجل المفاتيح</h1>
+  <p class="psub">كل مفتاح ولّدته — مين وإمتى ولمدة كام وبأي حالة</p>
+  <div class="card">
+    <div class="toolbar">
+      <input class="search" id="q" placeholder="بحث بالاسم / الهاتف / الكود..." oninput="render()">
+      <button class="btn secondary" onclick="render()">🔄 تحديث</button>
+      <button class="btn secondary" onclick="exportCSV()">⬇ تصدير CSV</button>
+    </div>
+    <div class="tbl-wrap">
+    <table><thead><tr>
+    <th>العميل</th><th>النوع</th><th>المدة</th><th>Device ID</th><th>المفتاح</th><th>التاريخ</th><th>الحالة</th><th></th>
+    </tr></thead><tbody id="rows"></tbody></table></div>
+  </div>
+</section>
+
+<!-- ═══════════ PAGE: DEVICES ═══════════ -->
+<section class="page" id="page-devices">
+  <h1>أجهزة العملاء</h1>
+  <p class="psub">احفظ الـ Device ID بتاع كل عميل من شاشة التفعيل — واستخدمه في توليد مفاتيح مرتبطة بجهازه</p>
+  <div class="card">
+    <h2><span class="ic">➕</span> إضافة جهاز</h2>
+    <div class="row">
+      <div style="flex:1;min-width:220px"><label>Device ID</label><input id="dev-id" placeholder="الصق المعرف من شاشة التفعيل"></div>
+      <div style="flex:1;min-width:180px"><label>صاحب الجهاز</label><input id="dev-owner" placeholder="اسم العميل"></div>
+      <button class="btn" onclick="addDev()">💾 حفظ</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2><span class="ic">💻</span> الأجهزة المحفوظة</h2>
+    <div id="devs"></div>
+  </div>
+</section>
+
+<!-- ═══════════ PAGE: SETTINGS ═══════════ -->
+<section class="page" id="page-settings">
+  <h1>الإعدادات</h1>
+  <p class="psub">ضبط الأداة ومكان المفتاح الخاص وسجل البيانات</p>
+  <div class="card">
+    <h2><span class="ic">🔑</span> مفتاح التوقيع</h2>
+    <div class="set-row">
+      <div>
+        <b style="font-size:.88rem">مسار المفتاح الخاص</b>
+        <p class="info" id="set-keypath">…</p>
+      </div>
+      <button class="btn secondary" onclick="revealKeyFolder()">📂 فتح المجلد</button>
+    </div>
+    <div class="set-row">
+      <div>
+        <b style="font-size:.88rem">بصمة المفتاح العام</b>
+        <p class="info" id="set-fp">…</p>
+      </div>
+      <button class="copy-btn" onclick="copyText(document.getElementById('set-fp').textContent)">📋</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2><span class="ic">💾</span> البيانات</h2>
+    <div class="set-row">
+      <div>
+        <b style="font-size:.88rem">موقع السجل</b>
+        <p class="info">keys.db داخل مجلد بيانات التطبيق (AppData)</p>
+      </div>
+      <button class="btn secondary" onclick="openDataFolder()">📂 فتح المجلد</button>
+    </div>
+    <div class="set-row">
+      <div>
+        <b style="font-size:.88rem">تصدير سجل المفاتيح</b>
+        <p class="info">ملف CSV يفتح في Excel</p>
+      </div>
+      <button class="btn secondary" onclick="exportCSV()">⬇ تصدير</button>
+    </div>
+    <div class="set-row">
+      <div>
+        <b style="font-size:.88rem">فتح شاشة التفعيل عند التشغيل</b>
+        <p class="info">يفتح المتصفح تلقائيًا على الأداة — الإعداد جوه التطبيق الحالي دائمًا</p>
+      </div>
+      <label class="switch"><input type="checkbox" checked disabled><span class="slider"></span></label>
+    </div>
+  </div>
+  <div class="card danger-zone">
+    <h2><span class="ic">⚠</span> منطقة الخطر</h2>
+    <div class="set-row">
+      <div>
+        <b style="font-size:.88rem">تفريغ سجل المفاتيح</b>
+        <p class="info">يحذف كل السجل نهائيًا — المفاتيح الموقعة الموجودة عند العملاء هتفضل شغالة (الإلغاء هنا توثيقي فقط)</p>
+      </div>
+      <button class="btn danger" onclick="wipeRegistry()">🗑 تفريغ السجل</button>
+    </div>
+    <div class="set-row">
+      <div>
+        <b style="font-size:.88rem">حول</b>
+        <p class="info">مدير مفاتيح Uni Kasher v1.1 · Tauri 2 · توقيع Ed25519 · أداة داخلية لصاحب البرنامج فقط</p>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<div class="toast" id="toast"></div>
+<script>
+const { invoke } = window.__TAURI__.core;
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',2600)}
+function v(id){return document.getElementById(id).value.trim()}
+/* ── navigation ── */
+document.querySelectorAll('.nav-item').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById('page-'+btn.dataset.page).classList.add('active');
+    if(btn.dataset.page==='registry')render();
+    if(btn.dataset.page==='devices')loadDevs();
+    if(btn.dataset.page==='generate')stats();
+  });
+});
+/* ── generate ── */
+async function gen(){
+  const body={customer:v('customer'),phone:v('phone'),note:v('note'),ltype:v('ltype'),dur:v('dur'),device:v('device'),startDays:parseInt(v('startdays')||'0')};
+  if(!body.customer && body.dur!=='lifetime'){toast('اكتب اسم العميل أولاً');return}
+  try{
+    const d=await invoke('generate_key',body);
+    document.getElementById('result').style.display='block';
+    document.getElementById('newcode').textContent=d.code;
+    document.getElementById('newmeta').textContent='license_id: '+d.license_id;
+    toast('تم توليد المفتاح وحفظه في السجل ✓');
+    render();stats();
+  }catch(e){toast(String(e))}
+}
+function copyText(c){navigator.clipboard.writeText(c);toast('تم النسخ ✓')}
+function copyNew(){copyText(document.getElementById('newcode').textContent)}
+async function revoke(id){if(!confirm('تعليم المفتاح كملغي في السجل؟'))return;await invoke('revoke_key',{id});render();stats()}
+async function fillFromLastDevice(){
+  const d=await invoke('list_devices');
+  if(!d.length){toast('لا توجد أجهزة محفوظة');return}
+  document.getElementById('device').value=d[0].device_id;toast('تم تعبئة آخر جهاز')
+}
+async function addDev(){if(!v('dev-id')){toast('الصق الـ Device ID أولاً');return}await invoke('add_device',{deviceId:v('dev-id'),owner:v('dev-owner')});document.getElementById('dev-id').value='';document.getElementById('dev-owner').value='';loadDevs();stats();toast('تم حفظ الجهاز ✓')}
+async function delDev(id){if(!confirm('حذف الجهاز من السجل؟'))return;await invoke('delete_device',{id});loadDevs();stats()}
+async function exportCSV(){
+  const d=await invoke('list_keys',{q:''});
+  let csv='\ufeffcustomer,phone,type,duration,device_id,license_code,issued_at,status\n';
+  d.forEach(x=>{csv+=[x.customer||'',x.phone||'',x.license_type,x.duration,x.device_id||'',x.license_code,x.issued_at,x.status].map(s=>'"'+String(s).replace(/"/g,'""')+'"').join(',')+'\n'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='unikasher-keys.csv';a.click();
+}
+async function wipeRegistry(){
+  if(!confirm('⚠ سيتم حذف كل السجل نهائيًا. متأكد؟'))return;
+  if(!confirm('تأكيد أخير: حذف كل صفوف السجل؟'))return;
+  try{await invoke('wipe_registry');toast('تم تفريغ السجل');render();stats()}catch(e){toast(String(e))}
+}
+async function revealKeyFolder(){try{await invoke('reveal_key_folder')}catch(e){toast(String(e))}}
+async function openDataFolder(){try{await invoke('open_data_folder')}catch(e){toast(String(e))}}
+async function loadDevs(){
+  const d=await invoke('list_devices');
+  const el=document.getElementById('devs');
+  if(!d.length){el.innerHTML='<div class="empty">لا توجد أجهزة محفوظة</div>';return}
+  el.innerHTML='<table><thead><tr><th>Device ID</th><th>صاحبه</th><th>أُضيف</th><th></th></tr></thead><tbody>'+
+    d.map(x=>`<tr><td class="code-mini" title="${x.device_id}">${x.device_id}</td><td>${x.owner||'—'}</td><td style="font-size:.7rem">${x.added_at||''}</td><td><button class="copy-btn" onclick="copyText('${x.device_id}')">📋</button> <button class="copy-btn" onclick="delDev(${x.id})">🗑</button></td></tr>`).join('')+'</tbody></table>';
+}
+async function render(){
+  const q=document.getElementById('q').value.trim();
+  const d=await invoke('list_keys',{q});
+  const tb=document.getElementById('rows');
+  if(!d.length){tb.innerHTML='<tr><td colspan="8"><div class="empty">لا توجد مفاتيح بعد</div></td></tr>';return}
+  tb.innerHTML=d.map(x=>{
+    const typeBadge=x.license_type==='TRIAL'?'<span class="badge b-trial">تجربة</span>':'<span class="badge b-full">اشتراك</span>';
+    const stBadge=x.status==='active'?'<span class="badge b-active">نشط</span>':'<span class="badge b-revoked">ملغي</span>';
+    return `<tr>
+      <td><b>${x.customer||'—'}</b>${x.note?'<br><span style="font-size:.68rem;color:#6b5a70">'+x.note+'</span>':''}</td>
+      <td>${typeBadge}</td><td>${x.duration}</td>
+      <td class="code-mini" title="${x.device_id||''}">${x.device_id||'غير مربوط'}</td>
+      <td><span class="code-mini" title="${x.license_code}" onclick="copyText('${x.license_code}')">${x.license_code}</span> <button class="copy-btn" onclick="copyText('${x.license_code}')">📋</button></td>
+      <td style="font-size:.72rem">${x.issued_at}</td>
+      <td>${stBadge}</td>
+      <td>${x.status==='active'?`<button class="copy-btn" onclick="revoke(${x.id})">إلغاء</button>`:''}</td>
+    </tr>`}).join('');
+}
+async function stats(){
+  const d=await invoke('stats');
+  document.getElementById('s-total').textContent=d.total;
+  document.getElementById('s-trial').textContent=d.trial;
+  document.getElementById('s-full').textContent=d.full;
+  document.getElementById('s-dev').textContent=d.devices;
+}
+async function loadSettings(){
+  const d=await invoke('get_settings');
+  document.getElementById('set-keypath').textContent=d.key_path;
+  document.getElementById('set-fp').textContent=d.fingerprint+'…';
+}
+(async()=>{
+  try{
+    const fp=await invoke('fingerprint');
+    document.getElementById('fp').textContent=fp+'…';
+  }catch(e){document.getElementById('fp').textContent='خطأ في قراءة المفتاح — ضع unikasher-private.key بجوار البرنامج'}
+  loadSettings();loadDevs();render();stats();
+})();
+</script></body></html>

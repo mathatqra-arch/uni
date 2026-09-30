@@ -1,0 +1,25 @@
+[package]
+name = "uni-kasher-key-manager"
+version = "1.0.0"
+description = "Uni Kasher Key Manager - License key generation & registry (owner-only tool)"
+authors = ["Uni Kasher"]
+edition = "2021"
+default-run = "uni-kasher-key-manager"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+uuid = { version = "1", features = ["v4"] }
+sha2 = "0.10"
+rusqlite = { version = "0.32", features = ["bundled"] }
+ed25519-dalek = { version = "2", features = ["std"] }
+open = "5"
+
+[[bin]]
+name = "uni-kasher-key-manager"
+path = "src/main.rs"
