@@ -1,0 +1,26 @@
+-- ============================================================
+-- Migration 007: sale_items.product_name (denormalized snapshot)
+-- ============================================================
+-- BUG: db/sqlite-schema.sql (the unified/reference schema) and
+-- desktop-api.ts (seedSalesHistory, handleCreateSale, etc.) have
+-- always written to a `product_name` column on sale_items — but
+-- no migration ever actually added that column to real pos.db
+-- files created via migrations/legacy/001_init.sql. Migration 003,
+-- which would have added it, was omitted (see main.rs) after it
+-- failed on existing databases with a duplicate-column error, and
+-- nothing replaced it.
+--
+-- Effect before this fix: every INSERT INTO sale_items(...,
+-- product_name, ...) failed with "table sale_items has no column
+-- named product_name". Because that failure happened inside an
+-- atomicExec() batch (BEGIN;...;COMMIT; as a single execute() call),
+-- the COMMIT was never reached and the connection was left sitting
+-- in an open transaction. Every subsequent write — including the
+-- very next seeding chunk and the setup-completion UPDATE — then
+-- failed too ("cannot start a transaction within a transaction",
+-- "database is locked").
+--
+-- This migration adds the column so those inserts succeed.
+-- ============================================================
+
+ALTER TABLE sale_items ADD COLUMN product_name TEXT;

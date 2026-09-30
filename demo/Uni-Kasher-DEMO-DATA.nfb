@@ -1,0 +1,693 @@
+{
+  "format": "nexflow-backup",
+  "version": 3,
+  "appVersion": "2.0.9",
+  "createdAt": "2026-09-13T03:40:00.000Z",
+  "schemaVersion": 27,
+  "device": "desktop",
+  "dataPolicy": "full-local-demo",
+  "tables": {
+    "stores": [
+      {
+        "id": "241d6a8f-39b2-4b8d-a671-64f3b62779ec",
+        "name": "متجر Uni Kasher التجريبي",
+        "address": "القاهرة - بيانات تجريبية",
+        "phone": "01000000001",
+        "email": "demo@unikasher.local",
+        "currency": "EGP",
+        "receipt_footer": "نسخة بيانات تجريبية — Uni Kasher",
+        "active": 1,
+        "created_at": "2026-09-13T03:40:00.000Z"
+      }
+    ],
+    "warehouses": [
+      {
+        "id": "7f65408d-01a2-47e3-ae01-2dd2e322396c",
+        "name": "المخزن الرئيسي",
+        "store_id": "241d6a8f-39b2-4b8d-a671-64f3b62779ec",
+        "location": "الدور الأول",
+        "created_at": "2026-09-13T03:40:00.000Z"
+      }
+    ],
+    "registers": [
+      {
+        "id": "47444615-60bb-475f-9923-37a9282026e8",
+        "name": "الكاشير الرئيسي",
+        "store_id": "241d6a8f-39b2-4b8d-a671-64f3b62779ec",
+        "active": 1,
+        "created_at": "2026-09-13T03:40:00.000Z"
+      }
+    ],
+    "users": [
+      {
+        "id": "4c02c3f9-0279-45d9-b442-24b54536ee78",
+        "email": "admin.demo@unikasher.local",
+        "username": "demo.admin",
+        "password_hash": "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+        "name": "مدير تجريبي",
+        "phone": "01000000002",
+        "role": "ADMIN",
+        "permissions": "[\"all\"]",
+        "active": 1,
+        "pin": null,
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      },
+      {
+        "id": "2b1ac4da-f008-4c69-9af7-1b74c08b21ac",
+        "email": "cashier.demo@unikasher.local",
+        "username": "demo.cashier",
+        "password_hash": "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+        "name": "كاشير تجريبي",
+        "phone": "01000000003",
+        "role": "CASHIER",
+        "permissions": "[]",
+        "active": 1,
+        "pin": null,
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      }
+    ],
+    "settings": [
+      {
+        "key": "tax.enabled",
+        "value": "true",
+        "category": "tax",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      },
+      {
+        "key": "tax.defaultRate",
+        "value": "14",
+        "category": "tax",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      },
+      {
+        "key": "tax.rates",
+        "value": "[{\"name\":\"ضريبة القيمة المضافة\",\"rate\":14}]",
+        "category": "tax",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      }
+    ],
+    "categories": [
+      {
+        "id": "4147787f-4d0b-4a03-911f-629d360bf7af",
+        "name": "Beverages",
+        "name_ar": "مشروبات",
+        "parent_id": null,
+        "color": "#D44D5C",
+        "icon": "coffee",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "dead_stock_days_override": null,
+        "sku_code": "BV"
+      },
+      {
+        "id": "e9af59fe-9d43-4597-bb32-3d37cc77060b",
+        "name": "Snacks",
+        "name_ar": "سناكس",
+        "parent_id": null,
+        "color": "#E8E5A4",
+        "icon": "cookie",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "dead_stock_days_override": null,
+        "sku_code": "SK"
+      }
+    ],
+    "brands": [
+      {
+        "id": "1058e877-4a34-4616-b064-b9d3894c3fd0",
+        "name": "Uni Demo",
+        "name_ar": "يوني ديمو",
+        "created_at": "2026-09-13T03:40:00.000Z"
+      }
+    ],
+    "units": [
+      {
+        "id": "06ad1ce8-bc42-4ce8-bbc8-33ea12f58713",
+        "name": "Piece",
+        "short_name": "قطعة",
+        "created_at": "2026-09-13T03:40:00.000Z"
+      }
+    ],
+    "products": [
+      {
+        "id": "558f8ae9-3a3f-496d-9a11-5e2967739f17",
+        "name": "Mineral Water",
+        "name_ar": "مياه معدنية",
+        "sku": "UK-WAT-001",
+        "barcode": "6221000000011",
+        "category_id": "4147787f-4d0b-4a03-911f-629d360bf7af",
+        "brand_id": "1058e877-4a34-4616-b064-b9d3894c3fd0",
+        "unit_id": "06ad1ce8-bc42-4ce8-bbc8-33ea12f58713",
+        "supplier_id": "7548c3ed-d215-4145-8dde-8ab6ce033b0e",
+        "purchase_cost": 5,
+        "selling_price": 10,
+        "wholesale_price": 9,
+        "tax_rate": 14,
+        "min_stock": 5,
+        "reorder_level": 8,
+        "track_stock": 1,
+        "allow_negative_stock": 0,
+        "avg_cost": 5,
+        "image": null,
+        "description": "منتج تجريبي",
+        "active": 1,
+        "current_stock": 48,
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "barcodes": "[]",
+        "store_id": "241d6a8f-39b2-4b8d-a671-64f3b62779ec",
+        "dead_stock_days_override": null
+      },
+      {
+        "id": "4b100634-299d-40ee-91f2-b8b650d57a61",
+        "name": "Orange Juice",
+        "name_ar": "عصير برتقال",
+        "sku": "UK-JUI-001",
+        "barcode": "6221000000012",
+        "category_id": "4147787f-4d0b-4a03-911f-629d360bf7af",
+        "brand_id": "1058e877-4a34-4616-b064-b9d3894c3fd0",
+        "unit_id": "06ad1ce8-bc42-4ce8-bbc8-33ea12f58713",
+        "supplier_id": "7548c3ed-d215-4145-8dde-8ab6ce033b0e",
+        "purchase_cost": 12,
+        "selling_price": 25,
+        "wholesale_price": 24,
+        "tax_rate": 14,
+        "min_stock": 5,
+        "reorder_level": 8,
+        "track_stock": 1,
+        "allow_negative_stock": 0,
+        "avg_cost": 12,
+        "image": null,
+        "description": "منتج تجريبي",
+        "active": 1,
+        "current_stock": 20,
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "barcodes": "[]",
+        "store_id": "241d6a8f-39b2-4b8d-a671-64f3b62779ec",
+        "dead_stock_days_override": null
+      },
+      {
+        "id": "1a689482-63a2-43ad-b3a5-f295c85a1999",
+        "name": "Chocolate Bar",
+        "name_ar": "لوح شوكولاتة",
+        "sku": "UK-SNK-001",
+        "barcode": "6221000000013",
+        "category_id": "e9af59fe-9d43-4597-bb32-3d37cc77060b",
+        "brand_id": "1058e877-4a34-4616-b064-b9d3894c3fd0",
+        "unit_id": "06ad1ce8-bc42-4ce8-bbc8-33ea12f58713",
+        "supplier_id": "7548c3ed-d215-4145-8dde-8ab6ce033b0e",
+        "purchase_cost": 8,
+        "selling_price": 16,
+        "wholesale_price": 15,
+        "tax_rate": 14,
+        "min_stock": 5,
+        "reorder_level": 8,
+        "track_stock": 1,
+        "allow_negative_stock": 0,
+        "avg_cost": 8,
+        "image": null,
+        "description": "منتج تجريبي",
+        "active": 1,
+        "current_stock": 6,
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "barcodes": "[]",
+        "store_id": "241d6a8f-39b2-4b8d-a671-64f3b62779ec",
+        "dead_stock_days_override": null
+      }
+    ],
+    "customers": [
+      {
+        "id": "60a25c9a-02ac-4360-acf5-2d540e705ede",
+        "name": "أحمد محمد (تجريبي)",
+        "phone": "01222222222",
+        "email": "customer@demo.local",
+        "address": "الجيزة",
+        "notes": "عميل تجريبي",
+        "birthday": null,
+        "tier": "SILVER",
+        "active": 1,
+        "loyalty_points": 120,
+        "total_earned": 120,
+        "total_redeemed": 0,
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null
+      }
+    ],
+    "suppliers": [
+      {
+        "id": "7548c3ed-d215-4145-8dde-8ab6ce033b0e",
+        "name": "المورد التجريبي",
+        "phone": "01111111111",
+        "email": "supplier@demo.local",
+        "address": "القاهرة",
+        "tax_id": "DEMO-001",
+        "balance": 0,
+        "active": 1,
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      }
+    ],
+    "expense_categories": [
+      {
+        "id": "8f848bc8-00b6-46a4-a891-77c7ebc9e22a",
+        "name": "Utilities",
+        "name_ar": "مرافق",
+        "color": "#772344",
+        "created_at": "2026-09-13T03:40:00.000Z"
+      }
+    ],
+    "expenses": [
+      {
+        "id": "193d61bb-bb46-46ab-bf40-a81804fb0256",
+        "category_id": "8f848bc8-00b6-46a4-a891-77c7ebc9e22a",
+        "user_id": "2b1ac4da-f008-4c69-9af7-1b74c08b21ac",
+        "amount": 120,
+        "payment_method": "CASH",
+        "note": "فاتورة كهرباء تجريبية",
+        "date": "2026-09-13",
+        "sync_status": "synced",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "client_txn_id": "DEMO-EXP-001",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      }
+    ],
+    "purchases": [],
+    "purchase_items": [],
+    "purchase_payments": [],
+    "sales": [
+      {
+        "id": "217cf7bc-7c9b-4433-ad75-7b403009d89a",
+        "client_txn_id": "DEMO-SALE-001",
+        "invoice_number": "DEMO-INV-1001",
+        "customer_id": "60a25c9a-02ac-4360-acf5-2d540e705ede",
+        "user_id": "2b1ac4da-f008-4c69-9af7-1b74c08b21ac",
+        "items_json": "[{\"productId\":\"558f8ae9-3a3f-496d-9a11-5e2967739f17\",\"productName\":\"مياه معدنية\",\"quantity\":2,\"unitPrice\":10,\"taxRate\":14,\"taxAmount\":2.8,\"total\":22.8,\"costAtSale\":5},{\"productId\":\"1a689482-63a2-43ad-b3a5-f295c85a1999\",\"productName\":\"لوح شوكولاتة\",\"quantity\":1,\"unitPrice\":16,\"taxRate\":14,\"taxAmount\":2.24,\"total\":18.24,\"costAtSale\":8}]",
+        "subtotal": 36,
+        "discount_amount": 0,
+        "tax_amount": 5.04,
+        "total": 41.04,
+        "paid_amount": 50,
+        "change_amount": 8.96,
+        "payment_method": "CASH",
+        "payment_details": "{}",
+        "loyalty_earned": 0,
+        "loyalty_redeemed": 0,
+        "note": "فاتورة تجريبية",
+        "status": "COMPLETED",
+        "sync_status": "synced",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null
+      }
+    ],
+    "sale_items": [
+      {
+        "id": "545643b5-91b6-4004-b4bc-49dc2a230705",
+        "sale_id": "217cf7bc-7c9b-4433-ad75-7b403009d89a",
+        "product_id": "558f8ae9-3a3f-496d-9a11-5e2967739f17",
+        "quantity": 2,
+        "unit_price": 10,
+        "discount_amount": 0,
+        "tax_amount": 2.8,
+        "total": 22.8,
+        "cost_at_sale": 5,
+        "deleted_at": null,
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "product_name": "مياه معدنية"
+      },
+      {
+        "id": "adb2e291-718b-4281-8339-b37fa9c3cd20",
+        "sale_id": "217cf7bc-7c9b-4433-ad75-7b403009d89a",
+        "product_id": "1a689482-63a2-43ad-b3a5-f295c85a1999",
+        "quantity": 1,
+        "unit_price": 16,
+        "discount_amount": 0,
+        "tax_amount": 2.24,
+        "total": 18.24,
+        "cost_at_sale": 8,
+        "deleted_at": null,
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "product_name": "لوح شوكولاتة"
+      }
+    ],
+    "sale_payments": [
+      {
+        "id": "64be6e19-b347-4ab0-9262-a8d34a04c025",
+        "sale_id": "217cf7bc-7c9b-4433-ad75-7b403009d89a",
+        "method": "CASH",
+        "amount": 50,
+        "reference": null,
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "sync_status": "synced",
+        "client_txn_id": "DEMO-SALE-001:PAY:0"
+      }
+    ],
+    "sale_returns": [],
+    "sale_return_items": [],
+    "cash_sessions": [
+      {
+        "id": "ebcc6451-ca5d-461a-b8ff-fbea13822dfd",
+        "user_id": "2b1ac4da-f008-4c69-9af7-1b74c08b21ac",
+        "opening_balance": 1000,
+        "closing_balance": null,
+        "expected_cash": null,
+        "difference": null,
+        "status": "OPEN",
+        "opened_at": "2026-09-13T03:40:00.000Z",
+        "closed_at": null,
+        "deleted_at": null,
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "register_id": "47444615-60bb-475f-9923-37a9282026e8",
+        "client_txn_id": "DEMO-CASH-OPEN-001"
+      }
+    ],
+    "cash_movements": [
+      {
+        "id": "a99d317b-3d0f-48f2-876d-95445f0f4717",
+        "session_id": "ebcc6451-ca5d-461a-b8ff-fbea13822dfd",
+        "type": "OPENING",
+        "amount": 1000,
+        "note": "رصيد افتتاحي تجريبي",
+        "ref_type": "CashSession",
+        "ref_id": "ebcc6451-ca5d-461a-b8ff-fbea13822dfd",
+        "sync_status": "synced",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "client_txn_id": "DEMO-CASH-MOV-OPEN-001",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      },
+      {
+        "id": "a463cc8d-13a1-4b63-8b94-37d15e43df47",
+        "session_id": "ebcc6451-ca5d-461a-b8ff-fbea13822dfd",
+        "type": "SALE",
+        "amount": 41.04,
+        "note": "DEMO-INV-1001",
+        "ref_type": "Sale",
+        "ref_id": "217cf7bc-7c9b-4433-ad75-7b403009d89a",
+        "sync_status": "synced",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "client_txn_id": "DEMO-SALE-001:CASH",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      },
+      {
+        "id": "3265d077-e6b9-44e5-b8f2-e1022d06e056",
+        "session_id": "ebcc6451-ca5d-461a-b8ff-fbea13822dfd",
+        "type": "EXPENSE",
+        "amount": 120,
+        "note": "فاتورة كهرباء تجريبية",
+        "ref_type": "Expense",
+        "ref_id": "193d61bb-bb46-46ab-bf40-a81804fb0256",
+        "sync_status": "synced",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "client_txn_id": "DEMO-EXP-001:CASH",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      }
+    ],
+    "stock_movements": [
+      {
+        "id": "83b13669-4b28-4a05-acb9-32205861aafc",
+        "product_id": "558f8ae9-3a3f-496d-9a11-5e2967739f17",
+        "type": "OPENING_STOCK",
+        "quantity": 50,
+        "ref_type": "Product",
+        "ref_id": "558f8ae9-3a3f-496d-9a11-5e2967739f17",
+        "note": "رصيد افتتاحي تجريبي",
+        "sync_status": "synced",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "client_txn_id": "DEMO-STOCK-OPEN-1",
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "warehouse_id": "7f65408d-01a2-47e3-ae01-2dd2e322396c",
+        "user_id": "2b1ac4da-f008-4c69-9af7-1b74c08b21ac"
+      },
+      {
+        "id": "f3550051-8295-4ec9-a979-d006b9d98249",
+        "product_id": "4b100634-299d-40ee-91f2-b8b650d57a61",
+        "type": "OPENING_STOCK",
+        "quantity": 20,
+        "ref_type": "Product",
+        "ref_id": "4b100634-299d-40ee-91f2-b8b650d57a61",
+        "note": "رصيد افتتاحي تجريبي",
+        "sync_status": "synced",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "client_txn_id": "DEMO-STOCK-OPEN-2",
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "warehouse_id": "7f65408d-01a2-47e3-ae01-2dd2e322396c",
+        "user_id": "2b1ac4da-f008-4c69-9af7-1b74c08b21ac"
+      },
+      {
+        "id": "286dee93-dad3-40a4-bae6-40fd160878cf",
+        "product_id": "1a689482-63a2-43ad-b3a5-f295c85a1999",
+        "type": "OPENING_STOCK",
+        "quantity": 7,
+        "ref_type": "Product",
+        "ref_id": "1a689482-63a2-43ad-b3a5-f295c85a1999",
+        "note": "رصيد افتتاحي تجريبي",
+        "sync_status": "synced",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "client_txn_id": "DEMO-STOCK-OPEN-3",
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "warehouse_id": "7f65408d-01a2-47e3-ae01-2dd2e322396c",
+        "user_id": "2b1ac4da-f008-4c69-9af7-1b74c08b21ac"
+      },
+      {
+        "id": "7445b893-4d0f-4ab4-a1cf-03b50160fd54",
+        "product_id": "558f8ae9-3a3f-496d-9a11-5e2967739f17",
+        "type": "SALE",
+        "quantity": -2,
+        "ref_type": "Sale",
+        "ref_id": "217cf7bc-7c9b-4433-ad75-7b403009d89a",
+        "note": "خصم من المخزون لفاتورة تجريبية",
+        "sync_status": "synced",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "client_txn_id": "DEMO-STOCK-SALE-1",
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "warehouse_id": "7f65408d-01a2-47e3-ae01-2dd2e322396c",
+        "user_id": "2b1ac4da-f008-4c69-9af7-1b74c08b21ac"
+      },
+      {
+        "id": "a172960e-f578-46ce-9c5d-9a6bb36b3be4",
+        "product_id": "1a689482-63a2-43ad-b3a5-f295c85a1999",
+        "type": "SALE",
+        "quantity": -1,
+        "ref_type": "Sale",
+        "ref_id": "217cf7bc-7c9b-4433-ad75-7b403009d89a",
+        "note": "خصم من المخزون لفاتورة تجريبية",
+        "sync_status": "synced",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null,
+        "client_txn_id": "DEMO-STOCK-SALE-2",
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "warehouse_id": "7f65408d-01a2-47e3-ae01-2dd2e322396c",
+        "user_id": "2b1ac4da-f008-4c69-9af7-1b74c08b21ac"
+      }
+    ],
+    "stock_adjustments": [],
+    "stock_levels": [],
+    "loyalty_tiers": [],
+    "loyalty_accounts": [
+      {
+        "id": "740e6b95-229d-4dea-8c51-9b87195277e8",
+        "customer_id": "60a25c9a-02ac-4360-acf5-2d540e705ede",
+        "points": 120,
+        "total_earned": 120,
+        "total_redeemed": 0,
+        "tier": "SILVER",
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "deleted_at": null
+      }
+    ],
+    "loyalty_transactions": [],
+    "loyalty_campaigns": [],
+    "sku_sequences": [],
+    "invoice_sequences": [],
+    "general_accounts": [
+      {
+        "id": "ga-cash",
+        "code": "1000",
+        "name": "Cash",
+        "name_ar": "الخزنة",
+        "account_type": "ASSET",
+        "parent_id": null,
+        "opening_balance": 0,
+        "active": "true",
+        "is_system": "true",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      },
+      {
+        "id": "ga-inventory",
+        "code": "1300",
+        "name": "Inventory",
+        "name_ar": "المخزون",
+        "account_type": "ASSET",
+        "parent_id": null,
+        "opening_balance": 0,
+        "active": "true",
+        "is_system": "true",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      },
+      {
+        "id": "ga-sales",
+        "code": "4000",
+        "name": "Sales Revenue",
+        "name_ar": "إيرادات المبيعات",
+        "account_type": "REVENUE",
+        "parent_id": null,
+        "opening_balance": 0,
+        "active": "true",
+        "is_system": "true",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      },
+      {
+        "id": "ga-sales-tax",
+        "code": "4010",
+        "name": "Sales Tax",
+        "name_ar": "ضريبة المبيعات",
+        "account_type": "LIABILITY",
+        "parent_id": null,
+        "opening_balance": 0,
+        "active": "true",
+        "is_system": "true",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      },
+      {
+        "id": "ga-cogs",
+        "code": "5000",
+        "name": "Cost of Goods Sold",
+        "name_ar": "تكلفة المبيعات",
+        "account_type": "COGS",
+        "parent_id": null,
+        "opening_balance": 0,
+        "active": "true",
+        "is_system": "true",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      },
+      {
+        "id": "ga-expense",
+        "code": "6020",
+        "name": "Utilities Expense",
+        "name_ar": "مصروف مرافق",
+        "account_type": "EXPENSE",
+        "parent_id": null,
+        "opening_balance": 0,
+        "active": "true",
+        "is_system": "true",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z"
+      }
+    ],
+    "general_journal_entries": [
+      {
+        "id": "56d77d9e-fb62-48f1-ae6c-066da39976f3",
+        "client_txn_id": "DEMO-SALE-001:GL",
+        "entry_no": "DEMO-JE-1001",
+        "entry_date": "2026-09-13T03:40:00.000Z",
+        "description": "قيد مبيعات تجريبي",
+        "reference_type": "Sale",
+        "reference_id": "217cf7bc-7c9b-4433-ad75-7b403009d89a",
+        "user_id": "2b1ac4da-f008-4c69-9af7-1b74c08b21ac",
+        "status": "POSTED",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "entry_source": "AUTOMATIC"
+      },
+      {
+        "id": "4b072c61-0f8a-467e-af45-8b288060ae51",
+        "client_txn_id": "DEMO-EXP-001:GL",
+        "entry_no": "DEMO-JE-1002",
+        "entry_date": "2026-09-13T03:40:00.000Z",
+        "description": "قيد مصروف مرافق تجريبي",
+        "reference_type": "Expense",
+        "reference_id": "193d61bb-bb46-46ab-bf40-a81804fb0256",
+        "user_id": "2b1ac4da-f008-4c69-9af7-1b74c08b21ac",
+        "status": "POSTED",
+        "created_at": "2026-09-13T03:40:00.000Z",
+        "updated_at": "2026-09-13T03:40:00.000Z",
+        "entry_source": "AUTOMATIC"
+      }
+    ],
+    "general_journal_lines": [
+      {
+        "id": "da97a0ef-5e0b-460a-b83f-683990d52e85",
+        "journal_entry_id": "56d77d9e-fb62-48f1-ae6c-066da39976f3",
+        "account_id": "ga-cash",
+        "debit": 41.04,
+        "credit": 0,
+        "note": "تحصيل نقدي"
+      },
+      {
+        "id": "76228262-0701-4dbb-abfa-f1eb1cbba2ca",
+        "journal_entry_id": "56d77d9e-fb62-48f1-ae6c-066da39976f3",
+        "account_id": "ga-sales",
+        "debit": 0,
+        "credit": 36,
+        "note": "إيراد المبيعات"
+      },
+      {
+        "id": "c6ac4ded-f2d4-40a3-b328-771f6d83e284",
+        "journal_entry_id": "56d77d9e-fb62-48f1-ae6c-066da39976f3",
+        "account_id": "ga-sales-tax",
+        "debit": 0,
+        "credit": 5.04,
+        "note": "ضريبة المبيعات"
+      },
+      {
+        "id": "788f08f0-ea16-4a80-8510-55782ab3dbbb",
+        "journal_entry_id": "56d77d9e-fb62-48f1-ae6c-066da39976f3",
+        "account_id": "ga-cogs",
+        "debit": 18,
+        "credit": 0,
+        "note": "تكلفة المبيعات"
+      },
+      {
+        "id": "65236ca0-1c7f-4a32-aa06-d8300913eaaa",
+        "journal_entry_id": "56d77d9e-fb62-48f1-ae6c-066da39976f3",
+        "account_id": "ga-inventory",
+        "debit": 0,
+        "credit": 18,
+        "note": "خروج المخزون"
+      },
+      {
+        "id": "da07753c-71a1-4831-b36c-af46f1d16444",
+        "journal_entry_id": "4b072c61-0f8a-467e-af45-8b288060ae51",
+        "account_id": "ga-expense",
+        "debit": 120,
+        "credit": 0,
+        "note": "مصروف مرافق"
+      },
+      {
+        "id": "44fc271e-ad63-42bc-9242-91e0405fe1fb",
+        "journal_entry_id": "4b072c61-0f8a-467e-af45-8b288060ae51",
+        "account_id": "ga-cash",
+        "debit": 0,
+        "credit": 120,
+        "note": "خروج نقدي"
+      }
+    ],
+    "audit_logs": [],
+    "sync_metadata": [],
+    "sync_queue": []
+  }
+}

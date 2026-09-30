@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Uni Kasher">
+  <rect width="256" height="256" rx="56" fill="#160029"/>
+  <path d="M66 60v82c0 32 17 52 47 52s47-20 47-52V60h-28v80c0 17-6 27-19 27s-19-10-19-27V60H66Z" fill="#F5EFE2"/>
+  <path d="M168 62h28v50l31-50h31l-36 61 37 69h-33l-30-56v56h-28V62Z" fill="#D44D5C"/>
+  <circle cx="213" cy="191" r="13" fill="#E8E5A4"/>
+</svg>

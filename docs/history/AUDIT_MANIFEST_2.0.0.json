@@ -1,0 +1,14 @@
+{
+  "product": "NexFlow Desktop",
+  "version": "2.0.0",
+  "scope": "desktop-only",
+  "deepAudit": "passed-static-and-migration-checks",
+  "localMigrationChain": "001-014 executed on fresh sqlite successfully",
+  "fullBuildVerified": false,
+  "tauriBuildVerified": false,
+  "backupMode": "dry-run + transactional merge",
+  "deadStockPrecedence": ["product", "subcategory", "category", "general"],
+  "deadStockDefaultDays": 60,
+  "cashNegative": "blocked",
+  "saleUnderpayment": "blocked until receivables ledger exists"
+}
