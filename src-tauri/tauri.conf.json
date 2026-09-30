@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Uni Kasher",
+  "version": "2.0.9",
+  "identifier": "com.unikasher.pos",
+  "build": {
+    "beforeDevCommand": "npm run dev:desktop",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build:desktop",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Uni Kasher - إدارة أعمالك بسهولة",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 600,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; connect-src 'self' http://localhost:1420; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/icon-32x32.png",
+      "icons/icon-128x128.png",
+      "icons/icon-256x256.png",
+      "icons/icon-128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "copyright": "© 2026 Uni Kasher",
+    "category": "Business",
+    "shortDescription": "Uni Kasher - Business Management",
+    "longDescription": "Uni Kasher - Professional business management system that works fully offline"
+  }
+}
