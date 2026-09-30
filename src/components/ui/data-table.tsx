@@ -70,14 +70,14 @@ export function DataTable<T extends object>({
     const k = rowKey ? rowKey(row) : (row as Record<string, unknown>).id ?? (row as Record<string, unknown>).key
     return (k === undefined || k === null ? index : k) as string | number
   }, [rowKey])
-  const cardClass = cn('uk-grid-table-card mb-6 flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-[0_8px_30px_-20px_rgba(22,0,41,0.24)]', className)
+  const cardClass = cn('uk-grid-table-card mb-6 flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-[0_8px_30px_-20px_rgba(22,0,41,0.24)]', className)
 
   if (loading) return <div className={cardClass} style={{ minHeight }}><div className="space-y-2.5 p-4">{Array.from({ length: skeletonRows }).map((_, index) => <Skeleton key={index} className="h-11 w-full" />)}</div></div>
   if (!rows.length) return <div className={cn(cardClass, 'justify-center')} style={{ minHeight }}><div className="py-14 text-center text-muted-foreground">{emptyContent ?? <p className="text-sm">{emptyMessage}</p>}</div></div>
 
   return (
     <div className={cardClass} style={{ minHeight }}>
-      <div ref={viewportRef} onScroll={syncBottomScrollbar} className="uk-grid-table-viewport flex-1 min-h-0 min-w-0" style={{ maxHeight: fillHeight ? `calc(100dvh - ${reserveHeight}px)` : maxHeight }}>
+      <div ref={viewportRef} onScroll={syncBottomScrollbar} className="uk-grid-table-viewport flex-1 min-h-0 min-w-0 w-full max-w-full" style={{ maxHeight: fillHeight ? `calc(100dvh - ${reserveHeight}px)` : maxHeight }}>
         <table className={cn('uk-grid-table', minWidth)} style={{ minWidth: minTableWidth, maxWidth: 'none' }}>
           <thead><tr>{columns.map((column) => <th key={column.key} className={cn('uk-grid-table-head', cellPad, 'text-center', column.align === 'left' && 'text-left', column.align === 'right' && 'text-right', column.width, column.className)}>{column.header}</th>)}</tr></thead>
           <tbody>{rows.map((row, index) => (
