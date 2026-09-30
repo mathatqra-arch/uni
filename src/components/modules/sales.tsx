@@ -853,9 +853,6 @@ function RefundDialog({ sale, open, onClose, onDone }: {
             />
           </div>
 
-            </div>
-          </div>
-
           <div className="rounded-lg bg-orange-500/10 border border-orange-500/20 p-3 flex justify-between items-center">
 
             <span className="text-sm font-medium">إجمالي الاسترجاع</span>
