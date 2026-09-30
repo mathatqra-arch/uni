@@ -84,10 +84,13 @@ export function EmployeesModule() {
     setDialogOpen(true)
   }
 
+  const isEditingSelfAdmin = !!editUser && editUser.id === user?.id && user?.role === 'ADMIN'
+
   const handleSave = async () => {
     setSaving(true)
     try {
-      const data: Record<string, unknown> = { name, username, email, phone, role, active }
+      const data: Record<string, unknown> = { name, username, email, phone, active }
+      if (!isEditingSelfAdmin) data.role = role
       // PIN is write-only in the API: never read or resend the stored hash.
       // A blank PIN on edit means "keep the existing PIN".
       if (pin) data.pin = pin
@@ -331,8 +334,13 @@ export function EmployeesModule() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>الدور *</Label>
-              <Select value={role} onValueChange={setRole}>
+              <div className="flex items-center justify-between">
+                <Label>الدور *</Label>
+                {isEditingSelfAdmin && (
+                  <span className="text-[11px] text-muted-foreground">صلاحية حسابك محمية</span>
+                )}
+              </div>
+              <Select value={role} onValueChange={setRole} disabled={isEditingSelfAdmin}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ADMIN">مدير (صلاحيات كاملة)</SelectItem>
@@ -343,6 +351,12 @@ export function EmployeesModule() {
                 </SelectContent>
               </Select>
             </div>
+            {isEditingSelfAdmin && (
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-800">
+                لا يمكن لمدير النظام تغيير دوره أو صلاحياته الذاتية. يمكنه تعديل بيانات الحساب الأخرى فقط.
+              </div>
+            )}
+
             <div className="flex items-center justify-between p-3 rounded-lg border">
               <div>
                 <Label>الحساب نشط</Label>
