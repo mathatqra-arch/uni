@@ -427,7 +427,7 @@ export function SalesModule() {
 
       {/* Detail Dialog */}
       <Dialog open={!!detail || detailLoading} onOpenChange={(o) => { if (!o) { setDetail(null); setDetailLoading(false) } }}>
-        <DialogContent className="w-[calc(100%-2rem)] max-w-5xl min-w-0 overflow-x-hidden overflow-y-auto max-h-[90vh]">
+        <DialogContent className="w-[calc(100%-2rem)] max-w-7xl min-w-0 overflow-x-hidden overflow-y-auto max-h-[90vh]">
           {detailLoading ? (
             <div className="py-8">
               <Skeleton className="h-8 w-48 mb-4" />
@@ -758,7 +758,7 @@ function RefundDialog({ sale, open, onClose, onDone }: {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-5xl min-w-0 overflow-hidden">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-7xl min-w-0 overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Undo2 className="w-5 h-5 text-orange-600" />
