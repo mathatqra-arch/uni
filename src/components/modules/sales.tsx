@@ -758,7 +758,7 @@ function RefundDialog({ sale, open, onClose, onDone }: {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-2xl min-w-0 overflow-x-hidden overflow-y-auto max-h-[90vh]">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-3xl min-w-0 overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Undo2 className="w-5 h-5 text-orange-600" />
@@ -772,10 +772,32 @@ function RefundDialog({ sale, open, onClose, onDone }: {
         {loadingSale || !effectiveSale ? (
           <div className="py-8 text-center text-sm text-muted-foreground">جاري تحميل بيانات الفاتورة...</div>
         ) : (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">حدد الكميات المراد استرجاعها:</p>
-          <div className="w-full min-w-0 max-w-full overflow-hidden">
-            <DataTable
+        <ScrollArea className="max-h-[70vh]">
+          <div className="space-y-4 pr-1">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-lg bg-muted/30">
+            <div>
+              <p className="text-xs text-muted-foreground">الفاتورة</p>
+              <p className="text-sm font-medium font-mono">{effectiveSale.invoiceNumber}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">العميل</p>
+              <p className="text-sm">{effectiveSale.customer?.name || 'عميل نقدي'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">التاريخ</p>
+              <p className="text-sm">{formatDateTime(effectiveSale.createdAt)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">الحالة</p>
+              <div className="mt-1">{getStatusBadge(effectiveSale.status)}</div>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold mb-2">الأصناف المراد استرجاعها</p>
+            <p className="text-xs text-muted-foreground mb-2">حدد الكميات المراد استرجاعها:</p>
+            <div className="w-full min-w-0 max-w-full overflow-hidden rounded-md border">
+              <DataTable
               maxHeight="480px"
               minWidth="min-w-[560px]"
               className="w-full min-w-0 max-w-full"
@@ -831,12 +853,14 @@ function RefundDialog({ sale, open, onClose, onDone }: {
             />
           </div>
 
-          <div className="rounded-md bg-orange-500/10 border border-orange-500/20 p-3 flex justify-between items-center">
+          <div className="rounded-lg bg-orange-500/10 border border-orange-500/20 p-3 flex justify-between items-center">
+
             <span className="text-sm font-medium">إجمالي الاسترجاع</span>
             <span className="text-lg font-bold text-orange-700 pos-number">{formatEGP(refundTotal)}</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
             <div className="space-y-1.5">
               <Label>طريقة استرجاع المبلغ</Label>
               <Select value={refundMethod} onValueChange={setRefundMethod}>
@@ -873,6 +897,7 @@ function RefundDialog({ sale, open, onClose, onDone }: {
             />
           </div>
         </div>
+        </ScrollArea>
         )}
 
         <DialogFooter>
