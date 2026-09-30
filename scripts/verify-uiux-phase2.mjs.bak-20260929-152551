@@ -1,0 +1,24 @@
+import fs from 'node:fs'
+import path from 'node:path'
+
+const root = process.cwd()
+const read = (p) => fs.readFileSync(path.join(root, p), 'utf8')
+const checks = [
+  ['dashboard uses UI store navigation', read('src/components/modules/dashboard.tsx').includes("useUIStore")],
+  ['dashboard has quick actions', read('src/components/modules/dashboard.tsx').includes('quick-action-card')],
+  ['dashboard has manual refresh action', read('src/components/modules/dashboard.tsx').includes('تحديث')],
+  ['dashboard insight fallback is resilient', read('src/components/modules/dashboard.tsx').includes("insight.message || insight.text")],
+  ['POS workspace shell exists', read('src/components/modules/pos.tsx').includes('pos-workspace')],
+  ['POS product cards have accessible labels', read('src/components/modules/pos.tsx').includes('aria-label={`إضافة ${p.nameAr || p.name} إلى الفاتورة`}')],
+  ['POS product cards have pressed feedback', read('src/desktop/globals.css').includes('.pos-workspace .product-card:active')],
+  ['POS cards have focus treatment', read('src/desktop/globals.css').includes('.pos-workspace .product-card:focus-visible')],
+  ['dashboard motion has reduced-motion fallback', read('src/desktop/globals.css').includes('.dashboard-mini-stat, .quick-action-card, .pos-workspace .product-card')],
+  ['phase2 quick-action tokens exist', read('src/desktop/globals.css').includes('.quick-primary') && read('src/desktop/globals.css').includes('.quick-secondary')],
+]
+let passed = 0
+for (const [name, ok] of checks) {
+  console.log(`${ok ? '✓' : '✗'} ${name}`)
+  if (ok) passed++
+}
+if (passed !== checks.length) process.exit(1)
+console.log(`Uni Kasher UI/UX Phase 2 verification: ${passed}/${checks.length}`)
