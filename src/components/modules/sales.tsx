@@ -296,7 +296,7 @@ export function SalesModule() {
               <SelectTrigger className="w-full md:w-44">
                 <SelectValue placeholder="كل الطرق" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="w-max min-w-[220px] max-w-[calc(100vw-2rem)]">
                 <SelectItem value="all">كل الطرق</SelectItem>
                 {Object.entries(PAYMENT_METHOD_META).map(([k, v]) => (
                   <SelectItem key={k} value={k}>{v.label}</SelectItem>
@@ -427,7 +427,7 @@ export function SalesModule() {
 
       {/* Detail Dialog */}
       <Dialog open={!!detail || detailLoading} onOpenChange={(o) => { if (!o) { setDetail(null); setDetailLoading(false) } }}>
-        <DialogContent className="w-[calc(100%-2rem)] max-w-4xl min-w-0 overflow-x-hidden overflow-y-auto max-h-[90vh]">
+        <DialogContent className="w-[calc(100%-2rem)] max-w-5xl min-w-0 overflow-x-hidden overflow-y-auto max-h-[90vh]">
           {detailLoading ? (
             <div className="py-8">
               <Skeleton className="h-8 w-48 mb-4" />
@@ -758,7 +758,7 @@ function RefundDialog({ sale, open, onClose, onDone }: {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-3xl min-w-0 overflow-hidden">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-5xl min-w-0 overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Undo2 className="w-5 h-5 text-orange-600" />
@@ -866,7 +866,7 @@ function RefundDialog({ sale, open, onClose, onDone }: {
               <Label>طريقة استرجاع المبلغ</Label>
               <Select value={refundMethod} onValueChange={setRefundMethod}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="w-max min-w-[220px] max-w-[calc(100vw-2rem)]">
                   <SelectItem value="CASH">نقدي</SelectItem>
                   <SelectItem value="CARD">بطاقة</SelectItem>
                   <SelectItem value="TRANSFER">تحويل</SelectItem>
@@ -877,7 +877,7 @@ function RefundDialog({ sale, open, onClose, onDone }: {
               <Label>سبب الاسترجاع *</Label>
               <Select value={reason} onValueChange={setReason}>
                 <SelectTrigger className="w-full"><SelectValue placeholder="اختر السبب" /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="w-max min-w-[220px] max-w-[calc(100vw-2rem)]">
                   <SelectItem value="DEFECTIVE">منتج معيب</SelectItem>
                   <SelectItem value="WRONG_ITEM">صنف خاطئ</SelectItem>
                   <SelectItem value="CUSTOMER_RETURN">استرجاع العميل</SelectItem>
