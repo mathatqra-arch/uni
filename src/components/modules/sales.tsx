@@ -427,7 +427,7 @@ export function SalesModule() {
 
       {/* Detail Dialog */}
       <Dialog open={!!detail || detailLoading} onOpenChange={(o) => { if (!o) { setDetail(null); setDetailLoading(false) } }}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl max-w-[calc(100%-2rem)] min-w-0 max-h-[90vh] overflow-x-hidden overflow-y-auto">
           {detailLoading ? (
             <div className="py-8">
               <Skeleton className="h-8 w-48 mb-4" />
