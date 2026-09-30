@@ -427,7 +427,7 @@ export function SalesModule() {
 
       {/* Detail Dialog */}
       <Dialog open={!!detail || detailLoading} onOpenChange={(o) => { if (!o) { setDetail(null); setDetailLoading(false) } }}>
-        <DialogContent className="sm:max-w-4xl max-w-[calc(100%-2rem)] min-w-0 max-h-[90vh] overflow-x-hidden overflow-y-auto">
+        <DialogContent className="w-[calc(100%-2rem)] max-w-4xl min-w-0 overflow-x-hidden overflow-y-auto max-h-[90vh]">
           {detailLoading ? (
             <div className="py-8">
               <Skeleton className="h-8 w-48 mb-4" />
@@ -435,12 +435,14 @@ export function SalesModule() {
               <Skeleton className="h-64 w-full" />
             </div>
           ) : detail ? (
-            <SaleDetail
-              sale={detail}
-              onClose={() => setDetail(null)}
-              onPrint={() => handlePrint(detail)}
-              onRefund={() => { setDetail(null); openRefund(detail) }}
-            />
+            <div className="w-full min-w-0 max-w-full overflow-hidden">
+              <SaleDetail
+                sale={detail}
+                onClose={() => setDetail(null)}
+                onPrint={() => handlePrint(detail)}
+                onRefund={() => { setDetail(null); openRefund(detail) }}
+              />
+            </div>
           ) : null}
         </DialogContent>
       </Dialog>
@@ -517,9 +519,12 @@ function SaleDetail({ sale, onClose, onPrint, onRefund }: {
       {/* Items */}
       <div>
         <p className="text-sm font-semibold mb-2">الأصناف ({formatNumber(itemCount)})</p>
-        <DataTable
-          maxHeight="480px"
-          columns={[
+        <div className="w-full min-w-0 max-w-full overflow-hidden">
+          <DataTable
+            maxHeight="480px"
+            minWidth="min-w-[560px]"
+            className="w-full min-w-0 max-w-full"
+            columns={[
             { key: 'c0', header: 'الصنف', cellClassName: "font-medium", render: (it) => (
                 <>{it.product?.nameAr || it.product?.name || '—'}
                                     {/* سعر وحدة = صفر هو المؤشر الوحيد المتاح حاليًا لصنف
@@ -537,8 +542,9 @@ function SaleDetail({ sale, onClose, onPrint, onRefund }: {
             { key: 'c3', header: 'الضريبة', align: 'left', cellClassName: "text-sm text-muted-foreground pos-number", render: (it) => formatEGP(it.taxAmount) },
             { key: 'c4', header: 'الإجمالي', align: 'left', cellClassName: "font-bold pos-number", render: (it) => formatEGP(it.total) },
           ]}
-          rows={(sale.items || [])}
-        />
+            rows={(sale.items || [])}
+          />
+        </div>
       </div>
 
       <Separator />
@@ -752,7 +758,7 @@ function RefundDialog({ sale, open, onClose, onDone }: {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-2xl min-w-0 overflow-x-hidden overflow-y-auto max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Undo2 className="w-5 h-5 text-orange-600" />
@@ -768,9 +774,12 @@ function RefundDialog({ sale, open, onClose, onDone }: {
         ) : (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">حدد الكميات المراد استرجاعها:</p>
-          <DataTable
-            maxHeight="480px"
-            columns={[
+          <div className="w-full min-w-0 max-w-full overflow-hidden">
+            <DataTable
+              maxHeight="480px"
+              minWidth="min-w-[560px]"
+              className="w-full min-w-0 max-w-full"
+              columns={[
               { key: 'c0', header: 'الصنف', cellClassName: "font-medium", render: (it) => (
                   <>{it.product?.nameAr || it.product?.name || '—'}
                                           <span className="text-xs text-muted-foreground block pos-number">{formatEGP(it.unitPrice)} / وحدة</span></>
@@ -818,8 +827,9 @@ function RefundDialog({ sale, open, onClose, onDone }: {
                   )
                 } },
             ]}
-            rows={(effectiveSale.items || [])}
-          />
+              rows={(effectiveSale.items || [])}
+            />
+          </div>
 
           <div className="rounded-md bg-orange-500/10 border border-orange-500/20 p-3 flex justify-between items-center">
             <span className="text-sm font-medium">إجمالي الاسترجاع</span>
