@@ -1,0 +1,349 @@
+// ============================================================
+// DESKTOP APP — Tauri React Application
+// ============================================================
+// This is the entry point for the Tauri desktop app (Vite build).
+// The shell is desktop-only and talks to the local SQLite-backed API
+// through apiFetch(); there is no browser/server route fallback.
+// routes to desktopApiFetch() which reads/writes local SQLite.
+//
+// Flow:
+//   1. Check setup status via apiFetch('/setup/status')
+//   2. If needsSetup → show SetupWizard (force admin password creation)
+//   3. If no user → show LoginScreen
+//   4. If user → show main app with Sidebar + active module
+// ============================================================
+
+import { useEffect, useState, Suspense, lazy } from 'react'
+import { useAuthStore, useUIStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
+import { Sparkles, ShoppingCart } from 'lucide-react'
+import { LoginScreen } from '@/components/pos/login-screen'
+import { SetupWizard } from '@/components/pos/setup-wizard'
+import { ThemeProvider } from '@/components/theme-provider'
+import { ModuleErrorBoundary } from '@/components/error-boundary'
+import { Sidebar } from '@/components/layout/sidebar'
+import { LicenseScreen } from '@/components/pos/license-screen'
+import { GlobalCommandPalette } from '@/components/layout/global-command-palette'
+import { Button } from '@/components/ui/button'
+import { Search } from 'lucide-react'
+
+// ─── Lazy-load modules to reduce initial bundle ───
+const DashboardModule = lazy(() => import('@/components/modules/dashboard').then(m => ({ default: m.DashboardModule })))
+const POSModule = lazy(() => import('@/components/modules/pos').then(m => ({ default: m.POSModule })))
+const ProductsModule = lazy(() => import('@/components/modules/products').then(m => ({ default: m.ProductsModule })))
+const InventoryModule = lazy(() => import('@/components/modules/inventory').then(m => ({ default: m.InventoryModule })))
+const SalesModule = lazy(() => import('@/components/modules/sales').then(m => ({ default: m.SalesModule })))
+const CustomersModule = lazy(() => import('@/components/modules/customers').then(m => ({ default: m.CustomersModule })))
+const LoyaltyModule = lazy(() => import('@/components/modules/loyalty').then(m => ({ default: m.LoyaltyModule })))
+const PurchasesModule = lazy(() => import('@/components/modules/purchases').then(m => ({ default: m.PurchasesModule })))
+const SuppliersModule = lazy(() => import('@/components/modules/suppliers').then(m => ({ default: m.SuppliersModule })))
+const CashModule = lazy(() => import('@/components/modules/cash').then(m => ({ default: m.CashModule })))
+const ExpensesModule = lazy(() => import('@/components/modules/expenses').then(m => ({ default: m.ExpensesModule })))
+const ReportsModule = lazy(() => import('@/components/modules/reports').then(m => ({ default: m.ReportsModule })))
+const GeneralAccountsModule = lazy(() => import('@/components/modules/general-accounts').then(m => ({ default: m.GeneralAccountsModule })))
+const AuditModule = lazy(() => import('@/components/modules/audit').then(m => ({ default: m.AuditModule })))
+const SettingsModule = lazy(() => import('@/components/modules/settings').then(m => ({ default: m.SettingsModule })))
+const CategoriesModule = lazy(() => import('@/components/modules/categories').then(m => ({ default: m.CategoriesModule })))
+const EmployeesModule = lazy(() => import('@/components/modules/employees').then(m => ({ default: m.EmployeesModule })))
+const PlatformAdminModule = lazy(() => import('@/components/modules/platform-admin').then(m => ({ default: m.PlatformAdminModule })))
+
+// Module loading fallback
+function ModuleLoader() {
+  return (
+    <div className="module-loader" role="status" aria-live="polite" aria-label="جاري تحميل الوحدة">
+      <div className="module-loader-card">
+        <div className="module-loader-mark" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-foreground">جاري تحميل الوحدة</p>
+          <p className="text-xs text-muted-foreground mt-1">بنجهز البيانات والواجهة...</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Module name mapping for error boundary
+const MODULE_NAMES: Record<string, string> = {
+  dashboard: 'لوحة التحكم',
+  pos: 'نقطة البيع',
+  products: 'المنتجات',
+  categories: 'الفئات',
+  inventory: 'المخزون',
+  sales: 'المبيعات',
+  customers: 'العملاء',
+  loyalty: 'الولاء',
+  purchases: 'المشتريات',
+  suppliers: 'الموردين',
+  cash: 'الدرج',
+  expenses: 'المصروفات',
+  reports: 'التقارير',
+  'general-accounts': 'الحسابات العامة',
+  employees: 'الموظفين',
+  desktop: 'تحميل Desktop',
+  audit: 'سجل التدقيق',
+  settings: 'الإعدادات',
+}
+
+export default function DesktopApp() {
+  const { user } = useAuthStore()
+  const { activeModule, setModule, theme } = useUIStore()
+  const [commandOpen, setCommandOpen] = useState(false)
+  // setupStatus states: 'loading' | 'needs-wizard' | 'ready' | 'error'
+  const [setupStatus, setSetupStatus] = useState<'loading' | 'needs-wizard' | 'ready' | 'error'>('loading')
+  const [licenseStatus, setLicenseStatus] = useState<'loading' | 'required' | 'valid' | 'error'>('loading')
+  const [licenseError, setLicenseError] = useState('')
+  const [setupError, setSetupError] = useState('')
+
+  // ─── License gate: verify before any POS/auth UI is shown ───
+  useEffect(() => {
+    let mounted = true
+    const checkLicense = async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        const result = await invoke<{ licensed: boolean }>('license_status')
+        if (mounted) setLicenseStatus(result.licensed ? 'valid' : 'required')
+      } catch (error) {
+        if (mounted) {
+          setLicenseError(error instanceof Error ? error.message : String(error))
+          setLicenseStatus('error')
+        }
+      }
+    }
+    void checkLicense()
+    return () => { mounted = false }
+  }, [])
+
+  // ─── Check setup status on mount ───
+  // In Tauri desktop mode, apiFetch() routes to desktopApiFetch() which
+  // reads from local SQLite. This checks if system.needsSetup = 'true'.
+  useEffect(() => {
+    let mounted = true
+    if (licenseStatus !== 'valid') return
+    const checkSetup = async () => {
+      try {
+        const data = await apiFetch('/setup/status')
+        if (mounted) {
+          if (data?.needsSetup) {
+            setSetupStatus('needs-wizard')
+          } else {
+            setSetupStatus('ready')
+          }
+        }
+      } catch (error) {
+        // A database/plugin failure is NOT equivalent to a fresh install.
+        // Treating it as setup-needed sends the user into a wizard that
+        // cannot work because the database is unavailable.
+        if (mounted) {
+          setSetupError(error instanceof Error ? error.message : String(error))
+          setSetupStatus('error')
+        }
+      }
+    }
+    checkSetup()
+    return () => { mounted = false }
+  }, [licenseStatus])
+
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const isTyping = !!target?.closest('input, textarea, [contenteditable="true"]')
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setCommandOpen((open) => !open)
+        return
+      }
+      if (!isTyping && event.key === 'F2' && licenseStatus === 'valid' && setupStatus === 'ready' && user) {
+        event.preventDefault()
+        setModule('pos')
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [licenseStatus, setupStatus, user, setModule])
+
+  // ─── License screen / loading
+  if (licenseStatus === 'loading') {
+    return (
+      <ThemeProvider>
+        <div className="min-h-screen flex items-center justify-center bg-background" dir="rtl">
+          <Sparkles className="w-7 h-7 text-primary animate-pulse" />
+        </div>
+      </ThemeProvider>
+    )
+  }
+
+  if (licenseStatus === 'error') {
+    return (
+      <ThemeProvider>
+        <div className="min-h-screen flex items-center justify-center bg-background p-6" dir="rtl">
+          <div className="w-full max-w-lg rounded-2xl border bg-card p-6 text-center shadow-xl">
+            <h1 className="text-xl font-bold">تعذر تشغيل طبقة الترخيص</h1>
+            <p className="mt-2 text-sm text-muted-foreground">ده خطأ في Tauri/Rust وليس معناه إن كود الترخيص غلط.</p>
+            <pre className="mt-4 max-h-40 overflow-auto rounded-lg bg-muted p-3 text-left text-xs whitespace-pre-wrap" dir="ltr">{licenseError || 'Unknown Tauri invocation error'}</pre>
+            <button className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-primary-foreground" onClick={() => { setLicenseError(''); setLicenseStatus('loading'); window.location.reload() }}>إعادة المحاولة</button>
+          </div>
+        </div>
+      </ThemeProvider>
+    )
+  }
+
+  if (licenseStatus === 'required') {
+    return (
+      <ThemeProvider>
+        <LicenseScreen onActivated={() => setLicenseStatus('valid')} />
+      </ThemeProvider>
+    )
+  }
+
+  // ─── Loading state ───
+  if (setupStatus === 'loading') {
+    return (
+      <ThemeProvider>
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground mb-4 animate-pulse">
+              <Sparkles className="w-8 h-8" />
+            </div>
+            <p className="text-muted-foreground">جاري التحميل...</p>
+          </div>
+        </div>
+      </ThemeProvider>
+    )
+  }
+
+  if (setupStatus === 'error') {
+    return (
+      <ThemeProvider>
+        <div className="min-h-screen flex items-center justify-center bg-background p-6" dir="rtl">
+          <div className="w-full max-w-lg rounded-2xl border bg-card p-6 text-center shadow-xl">
+            <h1 className="text-xl font-bold">قاعدة البيانات المحلية غير جاهزة</h1>
+            <p className="mt-2 text-sm text-muted-foreground">لم يتم فتح SQLite، لذلك أوقفت الشاشة لمنع إنشاء بيانات ناقصة أو مضللة.</p>
+            <pre className="mt-4 max-h-40 overflow-auto rounded-lg bg-muted p-3 text-left text-xs whitespace-pre-wrap" dir="ltr">{setupError || 'Unknown SQLite initialization error'}</pre>
+            <button className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-primary-foreground" onClick={() => window.location.reload()}>إعادة تشغيل البرنامج</button>
+          </div>
+        </div>
+      </ThemeProvider>
+    )
+  }
+
+  // ─── Setup wizard (first run) ───
+  if (setupStatus === 'needs-wizard' && !user) {
+    return (
+      <ThemeProvider>
+        <SetupWizard onComplete={() => setSetupStatus('ready')} />
+      </ThemeProvider>
+    )
+  }
+
+  // ─── Login screen ───
+  if (!user) {
+    return (
+      <ThemeProvider>
+        <LoginScreen />
+      </ThemeProvider>
+    )
+  }
+
+  // ─── Platform admin role → separate module ───
+  if (user.role === 'PLATFORM') {
+    return (
+      <ThemeProvider>
+        <Suspense fallback={<ModuleLoader />}>
+          <PlatformAdminModule />
+        </Suspense>
+      </ThemeProvider>
+    )
+  }
+
+  // ─── Main app ───
+  const renderModule = () => {
+    const moduleName = MODULE_NAMES[activeModule] || 'الوحدة'
+
+    const wrap = (el: React.ReactNode) => (
+      <ModuleErrorBoundary moduleName={moduleName}>
+        <Suspense fallback={<ModuleLoader />}>
+          {el}
+        </Suspense>
+      </ModuleErrorBoundary>
+    )
+
+    switch (activeModule) {
+      case 'dashboard': return wrap(<DashboardModule />)
+      case 'pos': return wrap(<POSModule />)
+      case 'products': return wrap(<ProductsModule />)
+      case 'categories': return wrap(<CategoriesModule />)
+      case 'inventory': return wrap(<InventoryModule />)
+      case 'sales': return wrap(<SalesModule />)
+      case 'customers': return wrap(<CustomersModule />)
+      case 'loyalty': return wrap(<LoyaltyModule />)
+      case 'purchases': return wrap(<PurchasesModule />)
+      case 'suppliers': return wrap(<SuppliersModule />)
+      case 'cash': return wrap(<CashModule />)
+      case 'expenses': return wrap(<ExpensesModule />)
+      case 'reports': return wrap(<ReportsModule />)
+      case 'general-accounts': return wrap(<GeneralAccountsModule />)
+      case 'employees': return wrap(<EmployeesModule />)
+      case 'audit': return wrap(<AuditModule />)
+      case 'settings': return wrap(<SettingsModule />)
+      default: return wrap(<DashboardModule />)
+    }
+  }
+
+  return (
+    <ThemeProvider>
+      <GlobalCommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+      <div data-theme={theme} className="flex flex-col md:flex-row h-screen overflow-hidden bg-background" dir="rtl">
+        <Sidebar />
+        <main id="main-content" tabIndex={-1} aria-label="المحتوى الرئيسي" className="flex-1 min-w-0 flex flex-col h-screen overflow-y-auto app-main-surface uk-visual-surface">
+          <header className="app-context-bar no-print">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl overflow-hidden bg-[#F5EFE2] ring-1 ring-[#772344]/10 shrink-0">
+                <img src="/icon-192.png" alt="" className="w-full h-full object-cover" draggable={false} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/70">Uni Kasher</p>
+                <p className="text-sm font-semibold truncate" title={MODULE_NAMES[activeModule] || 'لوحة التحكم'}>{MODULE_NAMES[activeModule] || 'لوحة التحكم'}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                className="h-9 rounded-xl gap-2 px-3 text-xs shadow-md"
+                onClick={() => setModule('pos')}
+                aria-label="الانتقال السريع إلى نقطة البيع (F2)"
+                title="الانتقال السريع إلى نقطة البيع (F2)"
+              >
+                <ShoppingCart className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">نقطة البيع</span>
+                <kbd className="hidden md:inline-flex h-5 items-center rounded-md border border-white/25 bg-white/15 px-1.5 font-mono text-[10px] text-white/90">F2</kbd>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-xl gap-2 bg-background/80 px-3 text-xs shadow-sm hover:bg-muted uk-focus-ring"
+                onClick={() => setCommandOpen(true)}
+                aria-label="فتح مركز البحث والأوامر"
+              >
+                <Search className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">بحث وأوامر</span>
+                <kbd className="hidden md:inline-flex h-5 items-center rounded-md border bg-muted px-1.5 font-mono text-[10px] text-muted-foreground">Ctrl K</kbd>
+              </Button>
+              <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="status-dot" aria-hidden="true" />
+                <span>محلي • SQLite</span>
+              </div>
+            </div>
+          </header>
+          <div className="flex-1 min-h-0 flex flex-col page-enter uk-visual-surface uk-scroll-region" data-active-module={activeModule}>
+            {renderModule()}
+          </div>
+        </main>
+      </div>
+    </ThemeProvider>
+  )
+}
