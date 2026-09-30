@@ -824,7 +824,7 @@ function SalesReport({ data }: { data: ReportData }) {
           <CardHeader className="pb-2"><CardTitle className="text-base">المبيعات المجمعة</CardTitle></CardHeader>
           <CardContent>
             <DataTable
-              maxHeight="none"
+              maxHeight="520px"
               columns={[
                 { key: 'c0', header: 'الفترة', cellClassName: "font-medium", render: (g) => g.key },
                 { key: 'c1', header: 'عدد الفواتير', align: 'left', cellClassName: "pos-number", render: (g) => fmtNum(g.count) },
@@ -855,7 +855,7 @@ function SalesReport({ data }: { data: ReportData }) {
         <CardHeader className="pb-2"><CardTitle className="text-base">تفاصيل المبيعات</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            maxHeight="none"
+            maxHeight="520px"
             columns={[
               { key: 'c0', header: 'رقم الفاتورة', cellClassName: "font-mono text-xs", render: (sale) => sale.invoiceNumber },
               { key: 'c1', header: 'التاريخ', cellClassName: "text-xs", render: (sale) => formatDateTime(sale.createdAt) },
@@ -905,7 +905,7 @@ function ProfitReport({ data }: { data: ReportData }) {
           <CardHeader className="pb-2"><CardTitle className="text-base">الأرباح حسب المنتج</CardTitle></CardHeader>
           <CardContent>
             <DataTable
-              maxHeight="none"
+              maxHeight="520px"
               columns={[
                 { key: 'c0', header: 'المنتج', cellClassName: "font-medium", render: (p) => p.nameAr || p.name },
                 { key: 'c1', header: 'SKU', cellClassName: "font-mono text-xs", render: (p) => p.sku },
@@ -944,7 +944,7 @@ function ProfitReport({ data }: { data: ReportData }) {
         <CardHeader className="pb-2"><CardTitle className="text-base">تفاصيل الأرباح</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            maxHeight="none"
+            maxHeight="520px"
             columns={[
               { key: 'c0', header: 'المنتج', cellClassName: "font-medium", render: (it) => it.product?.nameAr || it.product?.name || '—' },
               { key: 'c1', header: 'الكمية', align: 'left', cellClassName: "pos-number", render: (it) => fmtNum(it.quantity) },
@@ -1010,7 +1010,7 @@ function InventoryReport({ data }: { data: ReportData }) {
         <CardHeader className="pb-2"><CardTitle className="text-base">المخزون الحالي</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            maxHeight="none"
+            maxHeight="520px"
             columns={[
               { key: 'c0', header: 'المنتج', cellClassName: "font-medium", render: (p) => p.nameAr || p.name },
               { key: 'c1', header: 'SKU', cellClassName: "font-mono text-xs", render: (p) => p.sku },
@@ -1049,7 +1049,7 @@ function ProductReport({ data }: { data: ReportData }) {
         <CardHeader className="pb-2"><CardTitle className="text-base">أداء المنتجات</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            maxHeight="none"
+            maxHeight="520px"
             columns={[
               { key: 'c0', header: '#', cellClassName: "text-xs text-muted-foreground", render: (_, index) => index + 1 },
               { key: 'c1', header: 'المنتج', cellClassName: "font-medium", render: (r) => r.product?.nameAr || r.product?.name || '—' },
@@ -1083,7 +1083,7 @@ function CustomerReport({ data }: { data: ReportData }) {
         <CardHeader className="pb-2"><CardTitle className="text-base">أفضل العملاء</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            maxHeight="none"
+            maxHeight="520px"
             columns={[
               { key: 'c0', header: '#', cellClassName: "text-xs text-muted-foreground", render: (_, index) => index + 1 },
               { key: 'c1', header: 'العميل', cellClassName: "font-medium", render: (r) => r.customer?.name || '—' },
@@ -1117,7 +1117,7 @@ function SupplierReport({ data }: { data: ReportData }) {
         <CardHeader className="pb-2"><CardTitle className="text-base">الموردين</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            maxHeight="none"
+            maxHeight="520px"
             columns={[
               { key: 'c0', header: '#', cellClassName: "text-xs text-muted-foreground", render: (_, index) => index + 1 },
               { key: 'c1', header: 'المورد', cellClassName: "font-medium", render: (r) => r.supplier?.name || '—' },
@@ -1151,7 +1151,7 @@ function CashReport({ data }: { data: ReportData }) {
         <CardHeader className="pb-2"><CardTitle className="text-base">جلسات الكاش</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            maxHeight="none"
+            maxHeight="520px"
             columns={[
               { key: 'c0', header: 'المستخدم', cellClassName: "text-sm font-medium", render: (sess) => sess.user?.name || '—' },
               { key: 'c1', header: 'افتتاح', align: 'left', cellClassName: "pos-number", render: (sess) => fmtEGP(sess.openingBalance) },
@@ -1193,7 +1193,7 @@ function ExpenseReport({ data }: { data: ReportData }) {
           <CardHeader className="pb-2"><CardTitle className="text-base">المصروفات حسب الفئة</CardTitle></CardHeader>
           <CardContent>
             <DataTable
-              maxHeight="none"
+              maxHeight="520px"
               columns={[
                 { key: 'c0', header: 'الفئة', cellClassName: "font-medium", render: (c) => c.name },
                 { key: 'c1', header: 'عدد المصروفات', align: 'left', cellClassName: "pos-number", render: (c) => fmtNum(c.count) },
@@ -1252,7 +1252,7 @@ function LoyaltyReport({ data }: { data: ReportData }) {
         <CardHeader className="pb-2"><CardTitle className="text-base">حسابات الولاء</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            maxHeight="none"
+            maxHeight="520px"
             columns={[
               { key: 'c0', header: '#', cellClassName: "text-xs text-muted-foreground", render: (_, index) => index + 1 },
               { key: 'c1', header: 'العميل', cellClassName: "font-medium", render: (a) => a.customer?.name || '—' },
@@ -1287,7 +1287,7 @@ function TaxReport({ data }: { data: ReportData }) {
         <CardHeader className="pb-2"><CardTitle className="text-base">تفاصيل الضرائب</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            maxHeight="none"
+            maxHeight="520px"
             columns={[
               { key: 'c0', header: 'رقم الفاتورة', cellClassName: "font-mono text-xs", render: (sale) => sale.invoiceNumber },
               { key: 'c1', header: 'التاريخ', cellClassName: "text-xs", render: (sale) => formatDate(sale.createdAt) },
@@ -1401,7 +1401,7 @@ function ReturnsReport({ data }: { data: ReportData }) {
         <CardHeader className="pb-2"><CardTitle className="text-base">تفاصيل المرتجعات</CardTitle></CardHeader>
         <CardContent>
           <DataTable
-            maxHeight="none"
+            maxHeight="520px"
             columns={[
               { key: 'c0', header: 'رقم المرتجع', cellClassName: "font-mono text-xs", render: (ret) => ret.returnNumber },
               { key: 'c1', header: 'رقم الفاتورة', cellClassName: "font-mono text-xs", render: (ret) => ret.sale?.invoiceNumber },
