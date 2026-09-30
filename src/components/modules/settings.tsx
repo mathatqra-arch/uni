@@ -265,7 +265,20 @@ export function SettingsModule() {
     try {
       const result = await apiFetch('/system/integrity')
       if (result?.ok) toast.success('فحص سلامة النظام: لا توجد مشاكل حرجة')
-      else toast.error(`فحص السلامة: ${result?.groups || 0} نوع مشكلة / ${result?.issueCount || 0} حالة`, { description: (result?.issues || []).slice(0,3).map((x)=>x.label).join(' · ') })
+      else {
+        const details = (result?.issues || []).slice(0,3).map((x: any) => {
+          const row = x?.rows?.[0]
+          if (!row) return x?.label
+          const entryNo = row.entry_no || row.entryNo
+          const source = row.entry_source || row.entrySource
+          const debit = Number(row.debit || 0).toFixed(2)
+          const credit = Number(row.credit || 0).toFixed(2)
+          return entryNo
+            ? `${x.label}: ${entryNo} · ${source || '—'} · مدين ${debit} / دائن ${credit}`
+            : x.label
+        }).join(' · ')
+        toast.error(`فحص السلامة: ${result?.groups || 0} نوع مشكلة / ${result?.issueCount || 0} حالة`, { description: details })
+      }
     } catch (e) { notifyError(e) } finally { setIntegrityLoading(false) }
   }
 
