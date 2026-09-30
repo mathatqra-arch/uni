@@ -661,6 +661,12 @@ fn main() {
             sql: include_str!("../../migrations/sqlite/027_final_runtime_integrity.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 28,
+            description: "fix purchase payment trigger to avoid double-counting paid_amount",
+            sql: include_str!("../../migrations/sqlite/028_fix_purchase_payment_trigger.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
