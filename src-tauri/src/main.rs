@@ -667,6 +667,12 @@ fn main() {
             sql: include_str!("../../migrations/sqlite/028_fix_purchase_payment_trigger.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 29,
+            description: "repair missing automatic ledger entries and fix supplier-payment ledger traceability",
+            sql: include_str!("../../migrations/sqlite/029_repair_missing_automatic_ledger.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
