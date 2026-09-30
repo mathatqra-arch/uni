@@ -1,0 +1,150 @@
+import React from 'react'
+import { cn } from '@/lib/utils'
+import { formatEGP } from '@/lib/api'
+import { Badge } from '@/components/ui/badge'
+import { Plus, Gift, Award, Check, PackageX } from 'lucide-react'
+import type { Product, StockLevel } from '@/lib/types'
+
+export interface ProductCardProps {
+  product: Product
+  stock?: number
+  inCartCount?: number
+  campaignBonus?: number
+  pointsRequired?: number
+  allowNegativeStock?: boolean
+  onAddToCart: (product: Product) => void
+  onRedeemPoints?: (product: Product) => void
+  className?: string
+}
+
+/**
+ * POS product card — POS-CARD-FIX layout.
+ *
+ * Layout contract (do not regress):
+ * - flex column, fixed height (driven by .pos-card-fixed in globals.css)
+ * - row 1: stock/campaign badges (never wraps, never grows)
+ * - row 2: product name (always visible, 2-line clamp, min-h reserved)
+ * - row 3: footer (price + add button) pinned to the bottom via margin-top:auto
+ * - nothing inside the card may introduce margin-bottom (POS page contract)
+ */
+export function ProductCard({
+  product,
+  stock: providedStock,
+  inCartCount = 0,
+  campaignBonus = 0,
+  pointsRequired,
+  allowNegativeStock = false,
+  onAddToCart,
+  onRedeemPoints,
+  className,
+}: ProductCardProps) {
+  const stock = providedStock ?? (product.currentStock ?? (product.stockLevels?.reduce((s: number, l: StockLevel) => s + l.quantity, 0) || 0))
+  const isOutOfStock = stock <= 0 && !allowNegativeStock
+  const isLowStock = stock > 0 && stock <= (product.reorderLevel || 5)
+  const isInCart = inCartCount > 0
+
+  const handleClick = () => {
+    if (isOutOfStock) return
+    onAddToCart(product)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handleClick()
+    }
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={isOutOfStock ? -1 : 0}
+      aria-disabled={isOutOfStock}
+      aria-label={`إضافة ${product.nameAr || product.name} إلى الفاتورة`}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      className={cn(
+        "product-card group pos-card relative flex flex-col p-2.5 w-full rounded-xl border text-right cursor-pointer select-none transition-all duration-150 overflow-hidden",
+        "bg-card hover:bg-card border-border/80 hover:border-primary/50 shadow-xs hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]",
+        isInCart && "border-primary/80 ring-2 ring-primary/25 bg-primary/[0.04] shadow-sm",
+        isOutOfStock && "opacity-50 bg-muted/40 hover:bg-muted/40 hover:shadow-none hover:border-border hover:translate-y-0 cursor-not-allowed",
+        className
+      )}
+    >
+      {/* Row 1 — stock & campaign badges */}
+      <div className="flex items-center gap-1 min-h-[18px] shrink-0">
+        {isOutOfStock ? (
+          <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 font-medium shrink-0 flex items-center gap-0.5 rounded">
+            <PackageX className="w-2.5 h-2.5" />
+            نفد
+          </Badge>
+        ) : isLowStock ? (
+          <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 font-semibold pos-number shrink-0 rounded">
+            {stock} متبقي
+          </Badge>
+        ) : (
+          <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground font-medium pos-number shrink-0 rounded bg-secondary/80">
+            {stock} متاح
+          </Badge>
+        )}
+
+        {campaignBonus > 0 && !isInCart && (
+          <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/30 font-semibold shrink-0 flex items-center gap-0.5 rounded">
+            <Gift className="w-2.5 h-2.5" />
+            +{campaignBonus}
+          </Badge>
+        )}
+
+        {isInCart && (
+          <Badge className="bg-primary text-primary-foreground font-bold text-[9px] px-1.5 py-0 h-4 rounded-full shadow-xs flex items-center gap-0.5 shrink-0 ml-auto">
+            <Check className="w-2.5 h-2.5 stroke-[3]" />
+            <span>{inCartCount}</span>
+          </Badge>
+        )}
+      </div>
+
+      {/* Row 2 — product name (always visible) */}
+      <h3 className="pos-card-name font-semibold text-[12px] leading-snug line-clamp-2 mt-1.5 text-foreground group-hover:text-primary transition-colors break-words">
+        {product.nameAr || product.name}
+      </h3>
+
+      {/* Row 3 — footer: price + add action, pinned to bottom */}
+      <div className="mt-auto pt-1.5 border-t border-border/60 flex items-center justify-between gap-1.5">
+        <span className="text-[13px] font-black text-primary pos-number tracking-tight leading-none truncate">
+          {formatEGP(product.sellingPrice)}
+        </span>
+        <div
+          className={cn(
+            "w-6 h-6 rounded-md flex items-center justify-center font-bold transition-all duration-150 shrink-0 shadow-xs",
+            isInCart
+              ? "bg-primary text-primary-foreground scale-105"
+              : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105"
+          )}
+          title={isInCart ? `في الفاتورة: ${inCartCount}` : 'إضافة للفاتورة'}
+        >
+          {isInCart ? (
+            <span className="text-[10px] font-extrabold">{inCartCount}</span>
+          ) : (
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+          )}
+        </div>
+      </div>
+
+      {/* Optional redeem-points action (absolute so it never shifts the layout) */}
+      {!!pointsRequired && onRedeemPoints && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onRedeemPoints(product)
+          }}
+          className="absolute top-8 right-2.5 inline-flex items-center gap-0.5 text-[9px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/25 transition-colors"
+          title="استبدال بالنقاط"
+        >
+          <Award className="w-3 h-3 text-amber-500 shrink-0" />
+          <span>{pointsRequired} نقطة</span>
+        </button>
+      )}
+    </div>
+  )
+}

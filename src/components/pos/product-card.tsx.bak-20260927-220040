@@ -1,0 +1,157 @@
+'use client'
+
+import React from 'react'
+import { cn } from '@/lib/utils'
+import { formatEGP } from '@/lib/api'
+import { Badge } from '@/components/ui/badge'
+import { Plus, Gift, Award, Check, PackageX } from 'lucide-react'
+import type { Product, StockLevel } from '@/lib/types'
+
+export interface ProductCardProps {
+  product: Product
+  stock?: number
+  inCartCount?: number
+  campaignBonus?: number
+  pointsRequired?: number
+  allowNegativeStock?: boolean
+  onAddToCart: (product: Product) => void
+  onRedeemPoints?: (product: Product) => void
+  className?: string
+}
+
+export function ProductCard({
+  product,
+  stock: providedStock,
+  inCartCount = 0,
+  campaignBonus = 0,
+  pointsRequired,
+  allowNegativeStock = false,
+  onAddToCart,
+  onRedeemPoints,
+  className,
+}: ProductCardProps) {
+  const stock = providedStock ?? (product.currentStock ?? (product.stockLevels?.reduce((s: number, l: StockLevel) => s + l.quantity, 0) || 0))
+  const isOutOfStock = stock <= 0 && !allowNegativeStock
+  const isLowStock = stock > 0 && stock <= (product.reorderLevel || 5)
+  const isInCart = inCartCount > 0
+
+  const handleClick = () => {
+    if (isOutOfStock) return
+    onAddToCart(product)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handleClick()
+    }
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={isOutOfStock ? -1 : 0}
+      aria-disabled={isOutOfStock}
+      aria-label={`إضافة ${product.nameAr || product.name} إلى الفاتورة`}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      className={cn(
+        "group product-card relative grid grid-rows-[auto_1fr_auto] gap-1 p-2 w-full min-h-[100px] rounded-xl border text-right cursor-pointer select-none transition-all duration-150 overflow-hidden",
+        "bg-card/95 hover:bg-card border-border/70 hover:border-primary/50 shadow-xs hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]",
+        isInCart && "border-primary/80 ring-2 ring-primary/25 bg-primary/[0.04] shadow-sm",
+        isOutOfStock && "opacity-50 bg-muted/40 hover:bg-muted/40 hover:shadow-none hover:border-border hover:translate-y-0 cursor-not-allowed",
+        className
+      )}
+    >
+      {/* Top Badges Row */}
+      <div className="grid grid-cols-[1fr_auto] items-center gap-1 min-h-[18px]">
+        {/* Stock Badge */}
+        <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+          {isOutOfStock ? (
+            <Badge variant="destructive" className="text-[8px] px-1 py-0 h-4 font-medium shrink-0 flex items-center gap-0.5 rounded">
+              <PackageX className="w-2.5 h-2.5" />
+              نفد
+            </Badge>
+          ) : isLowStock ? (
+            <Badge variant="outline" className="text-[8px] px-1 py-0 h-4 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 font-semibold pos-number shrink-0 rounded">
+              {stock} متبقي
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="text-[8px] px-1 py-0 h-4 text-muted-foreground font-medium pos-number shrink-0 rounded bg-secondary/80">
+              {stock} متاح
+            </Badge>
+          )}
+
+          {/* Bonus Campaign Points */}
+          {campaignBonus > 0 && !isInCart && (
+            <Badge variant="outline" className="text-[8px] px-1 py-0 h-4 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/30 font-semibold shrink-0 flex items-center gap-0.5 rounded">
+              <Gift className="w-2.5 h-2.5" />
+              +{campaignBonus}
+            </Badge>
+          )}
+        </div>
+
+        {/* In Cart Counter Badge */}
+        {isInCart && (
+          <Badge className="bg-primary text-primary-foreground font-bold text-[9px] px-1.5 py-0 h-4 rounded-full shadow-xs flex items-center gap-0.5 shrink-0 animate-in fade-in zoom-in-75 duration-150">
+            <Check className="w-2.5 h-2.5 stroke-[3]" />
+            <span>{inCartCount}</span>
+          </Badge>
+        )}
+      </div>
+
+      {/* Product Content */}
+      <div className="min-w-0 grid grid-rows-[auto_auto_auto] gap-0.5 items-start overflow-hidden">
+        <h3 className="font-semibold text-[11px] leading-tight line-clamp-2 min-h-[1.75rem] text-foreground group-hover:text-primary transition-colors break-words">
+          {product.nameAr || product.name}
+        </h3>
+        {product.skuCode && (
+          <p className="text-[9px] font-mono text-muted-foreground/75 truncate tracking-wide">
+            {product.skuCode}
+          </p>
+        )}
+
+        {/* Redeem Points Action */}
+        {!!pointsRequired && onRedeemPoints && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onRedeemPoints(product)
+            }}
+            className="inline-flex items-center gap-0.5 text-[8px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-1 py-0.5 rounded border border-amber-500/20 transition-colors w-fit truncate"
+            title="استبدال بالنقاط"
+          >
+            <Award className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+            <span>{pointsRequired} نقطة</span>
+          </button>
+        )}
+      </div>
+
+      {/* Footer: Price & Add Action */}
+      <div className="grid grid-cols-[1fr_auto] items-center gap-1 pt-1 border-t border-border/50">
+        <div className="min-w-0 overflow-hidden">
+          <span className="text-xs font-black text-primary pos-number tracking-tight leading-none block truncate">
+            {formatEGP(product.sellingPrice)}
+          </span>
+        </div>
+
+        <div
+          className={cn(
+            "w-6 h-6 rounded-md flex items-center justify-center font-bold transition-all duration-150 shrink-0 shadow-xs",
+            isInCart
+              ? "bg-primary text-primary-foreground shadow-xs scale-105"
+              : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105"
+          )}
+          title={isInCart ? `في الفاتورة: ${inCartCount}` : 'إضافة للفاتورة'}
+        >
+          {isInCart ? (
+            <span className="text-[10px] font-extrabold">{inCartCount}</span>
+          ) : (
+            <Plus className="w-3 h-3 stroke-[2.5]" />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

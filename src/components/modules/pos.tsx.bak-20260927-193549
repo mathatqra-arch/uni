@@ -1,0 +1,2289 @@
+'use client'
+
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { apiFetch, formatEGP } from '@/lib/api'
+import { useCartStore, useAuthStore, useUIStore, useCashSessionStore, type CartItem } from '@/lib/store'
+import type { Product, Category, Customer, StockLevel } from '@/lib/types'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import type { CartState } from '@/lib/store'
+
+type PaymentPayload = { method: string; paid: number; details?: { splits?: Array<{ method: string; amount: number }> } }
+
+type SaleRowLite = Parameters<typeof ReceiptPrint>['0']['sale']
+
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
+} from '@/components/ui/dialog'
+import {
+  Sheet, SheetContent, SheetTrigger
+} from '@/components/ui/sheet'
+import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
+import { notifyError } from '@/lib/notify'
+import {
+  Search, ShoppingCart, Trash2, Plus, Minus, X, User, Tag, Pause, Play,
+  CreditCard, Banknote, Wallet, Percent, ChevronLeft,
+  ScanLine, Gift, UserPlus, Loader2, Award, ChevronRight
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { ReceiptPrint } from '@/components/pos/receipt-print'
+import { ProductCard } from '@/components/pos/product-card'
+import { generateUUID } from '@/lib/ids'
+
+export function POSModule() {
+  const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [search, setSearch] = useState('')
+  const [activeCategory, setActiveCategory] = useState('all')
+  const [productPage, setProductPage] = useState(0)
+  const [productPageSize, setProductPageSize] = useState(12)
+  const [loading, setLoading] = useState(false)
+  const [paymentOpen, setPaymentOpen] = useState(false)
+  const [customerOpen, setCustomerOpen] = useState(false)
+  const [discountOpen, setDiscountOpen] = useState(false)
+  const [heldOpen, setHeldOpen] = useState(false)
+  const [checkoutCustomerOpen, setCheckoutCustomerOpen] = useState(false)
+  const [lastSale, setLastSale] = useState<SaleRowLite | null>(null)
+  const [cartSheetOpen, setCartSheetOpen] = useState(false)
+  // ─── CASH REGISTER GATE ───
+  // Sales must not be allowed to start unless a register is open (see
+  // handleCreateSale's server-side check in desktop-api.ts, which is the
+  // real enforcement). This mirrors that on the UI so the cashier sees a
+  // clear message and a way to open the register *before* they build a
+  // whole cart and hit "pay" only to be rejected.
+  const [registerOpen, setRegisterOpen] = useState<boolean | null>(null)
+  const setModule = useUIStore((s) => s.setModule)
+  // Loyalty behavior must follow whatever the owner configured in
+  // Settings → الولاء (enable/disable, EGP-per-point, minimum to redeem) —
+  // previously calcTotals() hardcoded 0.05 EGP/point and there was no
+  // minimum-redeem enforcement at all, so editing those settings had no
+  // effect on the POS screen.
+  const [loyaltySettings, setLoyaltySettings] = useState({ enabled: true, egpPerPoint: 0.05, minRedeem: 0 })
+  // Settings → الضرائب → "تفعيل الضريبة". A store-wide off switch, distinct
+  // from the per-invoice "تعطيل الضريبة" button below (which stays
+  // available for one-off exempt invoices even while tax is on globally).
+  // When the owner turns this off, every new invoice starts tax-exempt and
+  // the per-invoice toggle is hidden — there is nothing left to toggle.
+  const [taxEnabled, setTaxEnabled] = useState(true)
+  // Per-product loyalty campaigns (see loyalty.tsx CampaignsTab) — maps
+  // productId → bonus points, so the product grid can show "+N نقطة" on
+  // whichever products currently have an active campaign.
+  const [campaignBonusByProduct, setCampaignBonusByProduct] = useState<Record<string, number>>({})
+  // Products redeemable with points instead of cash (loyalty.tsx →
+  // "منتجات بالنقاط" tab, stored as a settings JSON blob — see
+  // PointsProductsTab). Maps productId → points required.
+  const [pointsProductsByProduct, setPointsProductsByProduct] = useState<Record<string, number>>({})
+  const [redeemProductTarget, setRedeemProductTarget] = useState<Product | null>(null)
+  const [redeemingProduct, setRedeemingProduct] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
+  // Category row navigation: edge arrows + vertical-wheel → horizontal scroll.
+  const catRowRef = useRef<HTMLDivElement>(null)
+  const [catScroll, setCatScroll] = useState({ start: true, end: true })
+
+  const updateCatScroll = () => {
+    const el = catRowRef.current
+    if (!el) return
+    const max = el.scrollWidth - el.clientWidth
+    if (max <= 4) { setCatScroll({ start: true, end: true }); return }
+    const pos = Math.abs(el.scrollLeft)
+    setCatScroll({ start: pos <= 4, end: pos >= max - 4 })
+  }
+
+  const scrollCats = (dir: 'next' | 'prev') => {
+    const el = catRowRef.current
+    if (!el) return
+    const step = 260
+    const rtl = getComputedStyle(el).direction === 'rtl'
+    const sign = rtl ? -1 : 1
+    el.scrollBy({ left: dir === 'next' ? sign * step : -sign * step, behavior: 'smooth' })
+  }
+
+  useEffect(() => { updateCatScroll() }, [categories, loading])
+
+  // Vertical mouse wheel scrolls the category row horizontally (RTL-aware)
+  useEffect(() => {
+    const el = catRowRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault()
+        el.scrollLeft -= e.deltaY
+      }
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [categories])
+
+  // The product grid is paged instead of vertically scrolled so the POS
+  // workspace stays visually stable. Page size follows responsive density.
+  useEffect(() => {
+    const updateProductPageSize = () => {
+      const width = window.innerWidth
+      const nextSize = width < 640 ? 6 : width < 768 ? 9 : width < 1024 ? 12 : width < 1280 ? 15 : width < 1536 ? 18 : 21
+      setProductPageSize(nextSize)
+    }
+    updateProductPageSize()
+    window.addEventListener('resize', updateProductPageSize)
+    return () => window.removeEventListener('resize', updateProductPageSize)
+  }, [])
+
+  // Use selectors to prevent unnecessary re-renders when unrelated store fields change
+  // (e.g. `note` or `heldSales` updates no longer re-render the entire POS)
+  const { user } = useAuthStore()
+  const cartItems = useCartStore((s) => s.items)
+  const customerId = useCartStore((s) => s.customerId)
+  const customerName = useCartStore((s) => s.customerName)
+  const customerPhone = useCartStore((s) => s.customerPhone)
+  const loyaltyPoints = useCartStore((s) => s.loyaltyPoints)
+  const loyaltyRedeem = useCartStore((s) => s.loyaltyRedeem)
+  const cartDiscountAmount = useCartStore((s) => s.discountAmount)
+  const discountType = useCartStore((s) => s.discountType)
+  const cartNote = useCartStore((s) => s.note)
+  const heldSales = useCartStore((s) => s.heldSales)
+  const taxExempt = useCartStore((s) => s.taxExempt)
+  const setTaxExempt = useCartStore((s) => s.setTaxExempt)
+  // Actions (stable references — safe to grab whole store once)
+  const addItem = useCartStore((s) => s.addItem)
+  const removeItem = useCartStore((s) => s.removeItem)
+  const updateQuantity = useCartStore((s) => s.updateQuantity)
+  const clearCart = useCartStore((s) => s.clearCart)
+  const setCustomer = useCartStore((s) => s.setCustomer)
+  const setLoyaltyRedeem = useCartStore((s) => s.setLoyaltyRedeem)
+  const setDiscount = useCartStore((s) => s.setDiscount)
+  const setNote = useCartStore((s) => s.setNote)
+  const holdSale = useCartStore((s) => s.holdSale)
+  const retrieveHeldSale = useCartStore((s) => s.retrieveHeldSale)
+  const removeHeldSale = useCartStore((s) => s.removeHeldSale)
+
+  // Convenience alias for backward compat with existing code that uses `cart.X`
+  const cart = {
+    items: cartItems,
+    customerId,
+    customerName,
+    customerPhone,
+    loyaltyPoints,
+    loyaltyRedeem,
+    discountAmount: cartDiscountAmount,
+    discountType,
+    note: cartNote,
+    heldSales,
+    taxExempt,
+    addItem,
+    removeItem,
+    updateQuantity,
+    clearCart,
+    setCustomer,
+    setLoyaltyRedeem,
+    setDiscount,
+    setNote,
+    holdSale,
+    retrieveHeldSale,
+    removeHeldSale,
+  }
+
+  // Load products & categories
+  useEffect(() => {
+    loadData()
+    checkRegisterStatus()
+    loadLoyaltySettings()
+    loadCampaignBonuses()
+    loadPointsProducts()
+    loadTaxSettings()
+  }, [])
+
+  const loadTaxSettings = async () => {
+    try {
+      const data = await apiFetch('/settings')
+      const g = data?.grouped?.tax || {}
+      const enabled = g['tax.enabled'] !== 'false'
+      setTaxEnabled(enabled)
+      if (!enabled) setTaxExempt(true)
+    } catch {
+      // keep default (tax on) — POS should still work if settings fail to load
+    }
+  }
+
+  const loadPointsProducts = async () => {
+    try {
+      const data = await apiFetch('/settings')
+      const raw = data?.grouped?.loyalty?.['loyalty.pointsProducts']
+      const parsed = raw ? JSON.parse(raw) : []
+      const map: Record<string, number> = {}
+      for (const i of Array.isArray(parsed) ? parsed : []) {
+        if (i?.productId) map[i.productId] = i.pointsCost || 0
+      }
+      setPointsProductsByProduct(map)
+    } catch {
+      setPointsProductsByProduct({})
+    }
+  }
+
+  const loadCampaignBonuses = async () => {
+    try {
+      const campaigns = await apiFetch('/loyalty/campaigns?active=true')
+      const map: Record<string, number> = {}
+      for (const c of campaigns || []) {
+        if (c.productId) map[c.productId] = (map[c.productId] || 0) + (c.bonusPoints || 0)
+      }
+      setCampaignBonusByProduct(map)
+    } catch {
+      setCampaignBonusByProduct({})
+    }
+  }
+
+  const loadLoyaltySettings = async () => {
+    try {
+      const data = await apiFetch('/settings')
+      const g = data?.grouped?.loyalty || {}
+      setLoyaltySettings({
+        enabled: g['loyalty.enabled'] !== 'false',
+        egpPerPoint: parseFloat(g['loyalty.egpPerPoint']) || 0.05,
+        minRedeem: parseInt(g['loyalty.minRedeem']) || 0,
+      })
+    } catch {
+      // keep defaults — POS should still work if settings fail to load
+    }
+  }
+
+  const setGlobalRegisterOpen = useCashSessionStore((s) => s.setRegisterOpen)
+
+  const checkRegisterStatus = async () => {
+    try {
+      const session = await apiFetch('/cash')
+      setRegisterOpen(!!session)
+      setGlobalRegisterOpen(!!session)
+    } catch {
+      // If the check itself fails, don't block the cashier on a UI-only
+      // glitch — the server-side guard in handleCreateSale still applies
+      // as the real source of truth.
+      setRegisterOpen(true)
+      setGlobalRegisterOpen(true)
+    }
+  }
+
+  // Gate for every "start checkout" entry point (keyboard shortcut, the
+  // desktop pay button, and the mobile sheet's pay button) — all three
+  // funnel through this instead of calling setPaymentOpen directly.
+  const startCheckout = () => {
+    if (cart.items.length === 0) return
+    if (registerOpen === false) {
+      toast.error('لازم تفتح الخزنة الأول قبل ما تقدر تبيع', {
+        description: 'اضغط هنا للذهاب لشاشة الخزنة',
+        action: { label: 'فتح الخزنة', onClick: () => setModule('cash') },
+      })
+      return
+    }
+    if (!cart.customerId) {
+      setCheckoutCustomerOpen(true)
+    } else {
+      setPaymentOpen(true)
+    }
+  }
+
+  // Barcode scanner: rapid keypress detection.
+  // Only active when focus is OUTSIDE any input/textarea — the search box
+  // below has its own onKeyDown that already handles scans typed into it.
+  // (Previously this ran unconditionally too, so scanning while the search
+  // box was focused — the normal workflow — added every item to the cart
+  // TWICE. isInInput was computed but never actually used to skip.)
+  useEffect(() => {
+    let buffer = ''
+    let lastKeyTime = 0
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isInInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
+      if (isInInput) return
+
+      const now = Date.now()
+      if (now - lastKeyTime > 100) buffer = ''
+      lastKeyTime = now
+
+      if (e.key === 'Enter' && buffer.length >= 4) {
+        e.preventDefault()
+        handleBarcode(buffer)
+        buffer = ''
+      } else if (e.key.length === 1) {
+        buffer += e.key
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [products])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+      if (e.key === 'F2') { e.preventDefault(); searchRef.current?.focus() }
+      if (e.key === 'F3') { e.preventDefault(); setCustomerOpen(true) }
+      if (e.key === 'F4') { e.preventDefault(); setDiscountOpen(true) }
+      if (e.key === 'F5') { e.preventDefault(); handleHold() }
+      if (e.key === 'F6') { e.preventDefault(); setHeldOpen(true) }
+      if (e.key === 'F8') { e.preventDefault(); startCheckout() }
+      if (e.key === 'Escape') { e.preventDefault(); setPaymentOpen(false); setCustomerOpen(false); setDiscountOpen(false) }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [cart.items, registerOpen])
+
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      // apiFetch automatically routes to SQLite in desktop mode
+      const [prods, cats] = await Promise.all([
+        apiFetch('/products?limit=200').catch(() => []),
+        apiFetch('/categories').catch(() => []),
+      ])
+
+      setProducts(prods || [])
+      setCategories(cats || [])
+    } catch {
+      setProducts([])
+      setCategories([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBarcode = async (barcode: string) => {
+    const code = barcode.trim()
+    if (!code) return
+    // Safe barcode lookup — try/catch around JSON.parse for malformed barcodes array
+    const product = products.find(p => {
+      if (p.barcode === code) return true
+      if (p.barcodes) {
+        try {
+          // barcodes may be a JSON string (SQLite TEXT) or already an array
+          const extra = typeof p.barcodes === 'string' ? JSON.parse(p.barcodes) : p.barcodes
+          return Array.isArray(extra) && extra.includes(code)
+        } catch {
+          return false
+        }
+      }
+      return false
+    })
+    if (product) {
+      addToCart(product)
+      toast.success(`${product.nameAr || product.name} - تمت الإضافة`, { duration: 1500 })
+    } else {
+      toast.error(`الباركود غير موجود: ${code}`)
+    }
+    if (searchRef.current) searchRef.current.value = ''
+    setSearch('')
+  }
+
+  const addToCart = (product: Product) => {
+    if (!product.active) { toast.error('المنتج غير مفعل'); return }
+    // FIX: this is wired to the whole product card, not just the amber
+    // "استبدال بالنقاط" button — so clicking the card again for a product
+    // that's already in the cart as a points-redeemed line used to merge
+    // straight into cart.addItem's generic quantity++ (see store.ts), with
+    // NO points check and NO extra deduction at all. That's how a points
+    // item kept growing "even with no points": every second click was a
+    // free unit, points balance or not. Route that case through the same
+    // checked path as the cart's own "+" stepper instead.
+    const existingLine = cart.items.find(i => i.productId === product.id)
+    if (existingLine?.isPointsItem) {
+      incrementPointsItem(existingLine)
+      return
+    }
+    const stock = product.currentStock ?? (product.stockLevels?.reduce((s: number, l: StockLevel) => s + l.quantity, 0) || 0)
+    if (!product.allowNegativeStock && stock <= 0) {
+      toast.error('المنتج غير متوفر في المخزون')
+      return
+    }
+    // Stock ceiling: never allow more units than the available stock.
+    // (Backend still enforces the same rule server-side; this keeps the
+    // UI honest so the cashier never builds an impossible invoice.)
+    if (!product.allowNegativeStock && existingLine && existingLine.quantity + 1 > stock) {
+      toast.error(`الحد الأقصى المتاح: ${stock} وحدة فقط`, { description: product.nameAr || product.name })
+      return
+    }
+    cart.addItem({
+      productId: product.id,
+      name: product.name,
+      nameAr: product.nameAr ?? undefined,
+      barcode: product.barcode ?? undefined,
+      sku: product.sku,
+      price: product.sellingPrice,
+      cost: product.avgCost || product.purchaseCost,
+      taxRate: product.taxRate,
+      quantity: 1,
+      stock,
+      image: product.image ?? undefined,
+    })
+  }
+
+  // "استبدال بالنقاط" — add a points-eligible product to the cart FOR FREE
+  // (price 0, no tax) and immediately deduct its points cost from the
+  // customer's balance via the same atomic /loyalty/redeem endpoint used
+  // in loyalty.tsx (balance validation + idempotency already handled
+  // there). Deliberately kept separate from the cart's normal
+  // loyaltyRedeem/discount flow — that flow converts points into an EGP
+  // discount off the whole bill at loyaltySettings.egpPerPoint; a points
+  // product's cost is set independently by the owner and should always
+  // come straight off the bill as ٠ ج.م, not as a converted discount.
+  const confirmRedeemProduct = async () => {
+    const product = redeemProductTarget
+    if (!product) return
+    const pointsCost = pointsProductsByProduct[product.id] || 0
+    if (!cart.customerId) { toast.error('اختر عميل أولاً لاستبدال منتج بالنقاط'); return }
+    if ((loyaltyPoints || 0) < pointsCost) {
+      toast.error(`رصيد النقاط غير كافٍ. المتاح: ${loyaltyPoints || 0} نقطة`)
+      return
+    }
+    const stock = product.currentStock ?? (product.stockLevels?.reduce((s: number, l: StockLevel) => s + l.quantity, 0) || 0)
+    if (!product.allowNegativeStock && stock <= 0) {
+      toast.error('المنتج غير متوفر في المخزون')
+      return
+    }
+    setRedeemingProduct(true)
+    try {
+      const clientTxnId = generateUUID()
+      await apiFetch('/loyalty/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Client-Txn-Id': clientTxnId },
+        body: JSON.stringify({
+          customerId: cart.customerId,
+          points: pointsCost,
+          note: `استبدال منتج: ${product.nameAr || product.name}`,
+          clientTxnId,
+        }),
+      })
+      cart.addItem({
+        productId: product.id,
+        name: product.name,
+        nameAr: `${product.nameAr || product.name} (بالنقاط)`,
+        barcode: product.barcode ?? undefined,
+        sku: product.sku,
+        price: 0,
+        cost: product.avgCost || product.purchaseCost,
+        taxRate: 0,
+        quantity: 1,
+        stock,
+        image: product.image ?? undefined,
+        isPointsItem: true,
+        pointsCost,
+      })
+      // Reflect the new balance locally without a full customer re-fetch.
+      setCustomer(cart.customerId, cart.customerName, cart.customerPhone, (loyaltyPoints || 0) - pointsCost)
+      toast.success(`تم استبدال ${pointsCost} نقطة بـ ${product.nameAr || product.name}`)
+      setRedeemProductTarget(null)
+    } catch (e) {
+      notifyError(e, { context: 'استبدال النقاط' })
+    } finally {
+      setRedeemingProduct(false)
+    }
+  }
+
+  // Add ONE more free unit of an already-in-cart points item — this is the
+  // only way to grow its quantity. FIX: the generic "+" stepper used to be
+  // wired to every cart line including points lines, so tapping it just
+  // bumped `quantity` locally with no re-check and no extra points ever
+  // deducted — an unlimited number of free units for the first points
+  // spent. Every extra unit now goes through the same atomic
+  // /loyalty/redeem call as the first one, so quantity can never outrun
+  // what the customer's balance actually covers.
+  const incrementPointsItem = async (item: CartItem) => {
+    const pointsCost = item.pointsCost || 0
+    if ((loyaltyPoints || 0) < pointsCost) {
+      toast.error(`رصيد النقاط غير كافٍ لإضافة وحدة أخرى. المتاح: ${loyaltyPoints || 0} نقطة`)
+      return
+    }
+    try {
+      const clientTxnId = generateUUID()
+      await apiFetch('/loyalty/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Client-Txn-Id': clientTxnId },
+        body: JSON.stringify({
+          customerId: cart.customerId,
+          points: pointsCost,
+          note: `استبدال منتج (وحدة إضافية): ${item.nameAr || item.name}`,
+          clientTxnId,
+        }),
+      })
+      cart.updateQuantity(item.productId, item.quantity + 1)
+      setCustomer(cart.customerId!, cart.customerName, cart.customerPhone, (loyaltyPoints || 0) - pointsCost)
+    } catch (e) {
+      notifyError(e, { context: 'استبدال النقاط' })
+    }
+  }
+
+  // Refund `points` back to the current customer's balance via the atomic
+  // /loyalty/refund endpoint, then reflect the new balance locally. Returns
+  // true on success so callers can decide whether it's safe to also mutate
+  // the cart (see removePointsAwareItem / decrementPointsItem below).
+  const refundPoints = async (points: number, note: string) => {
+    if (!cart.customerId || points <= 0) return true
+    try {
+      const clientTxnId = generateUUID()
+      await apiFetch('/loyalty/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Client-Txn-Id': clientTxnId },
+        body: JSON.stringify({ customerId: cart.customerId, points, note, clientTxnId }),
+      })
+      setCustomer(cart.customerId, cart.customerName, cart.customerPhone, (loyaltyPoints || 0) + points)
+      return true
+    } catch (e) {
+      notifyError(e, { context: 'استرجاع النقاط' })
+      return false
+    }
+  }
+
+  // Remove a cart line entirely. FIX: deleting a "استبدال بالنقاط" line used
+  // to just drop it from the cart with cart.removeItem — the points already
+  // deducted when it was added (confirmRedeemProduct/incrementPointsItem)
+  // never came back, so cancelling the line before checkout permanently
+  // cost the customer points for a product they never received. Now the
+  // full points cost of the line (per-unit cost × quantity) is refunded
+  // first, then the line is removed either way so the cart never gets stuck
+  // on a failed refund call.
+  const removePointsAwareItem = async (item: CartItem) => {
+    if (item.isPointsItem && item.pointsCost) {
+      await refundPoints(
+        item.pointsCost * item.quantity,
+        `استرجاع نقاط — حذف من السلة: ${item.nameAr || item.name}`
+      )
+    }
+    cart.removeItem(item.productId)
+  }
+
+  // "مسح" (clear/cancel the whole current sale) has the exact same bug as a
+  // single-line removal: any points-redeemed lines in the cart already had
+  // their points deducted, so wiping the cart must refund all of them
+  // first, not just drop cart.items and leave the customer's balance short.
+  const clearCartRefundingPoints = async () => {
+    const pointsItems = cart.items.filter(i => i.isPointsItem && i.pointsCost)
+    for (const item of pointsItems) {
+      await refundPoints(
+        (item.pointsCost || 0) * item.quantity,
+        `استرجاع نقاط — إلغاء الفاتورة: ${item.nameAr || item.name}`
+      )
+    }
+    cart.clearCart()
+  }
+
+  // Symmetric counterpart to incrementPointsItem for the "-" stepper: refund
+  // one unit's worth of points, then either lower the quantity or drop the
+  // line if it hits zero. Same underlying bug as removePointsAwareItem —
+  // the stepper used to call cart.updateQuantity directly with no refund.
+  const decrementPointsItem = async (item: CartItem) => {
+    const pointsCost = item.pointsCost || 0
+    const ok = await refundPoints(
+      pointsCost,
+      `استرجاع نقاط — تقليل الكمية: ${item.nameAr || item.name}`
+    )
+    if (!ok) return
+    if (item.quantity - 1 <= 0) {
+      cart.removeItem(item.productId)
+    } else {
+      cart.updateQuantity(item.productId, item.quantity - 1)
+    }
+  }
+
+  const filteredProducts = products.filter(p => {
+    const matchCat = activeCategory === 'all' || p.categoryId === activeCategory
+    const matchSearch = !search ||
+      p.name?.toLowerCase().includes(search.toLowerCase()) ||
+      p.nameAr?.includes(search) ||
+      p.barcode?.includes(search) ||
+      p.sku?.toLowerCase().includes(search.toLowerCase())
+    return matchCat && matchSearch && p.active
+  })
+
+  const totalProductPages = Math.max(1, Math.ceil(filteredProducts.length / productPageSize))
+  const safeProductPage = Math.min(productPage, totalProductPages - 1)
+  const pagedProducts = filteredProducts.slice(
+    safeProductPage * productPageSize,
+    (safeProductPage + 1) * productPageSize,
+  )
+
+  useEffect(() => {
+    setProductPage(0)
+  }, [search, activeCategory, productPageSize])
+
+  // ============================================================
+  // CALCULATIONS — single source of truth (no duplication)
+  // ============================================================
+  // Fix: percent discount was treated as fixed EGP amount.
+  // Now: if discountType === 'PERCENT', discount = subtotal * amount / 100
+  //       if discountType === 'FIXED', discount = amount (clamped to subtotal)
+  // ============================================================
+  const calcTotals = useCallback(() => {
+    const subtotal = cart.items.reduce((s, i) => s + i.price * i.quantity, 0)
+    // FIX: this used to check ONLY cart.taxExempt (the per-invoice toggle),
+    // never taxEnabled (the global Settings → الضرائب switch). taxExempt
+    // resets to false on every clearCart()/new sale, but taxEnabled stays
+    // off — so after the very first sale, new invoices kept charging tax
+    // while the UI still showed "موقوفة من الإعدادات" (it reads taxEnabled
+    // for the badge, but the actual math read taxExempt). Now the global
+    // switch is checked directly here too, so the number always matches
+    // what the badge says regardless of per-invoice toggle state.
+    const effectiveTaxExempt = !taxEnabled || cart.taxExempt
+    const taxAmount = effectiveTaxExempt
+      ? 0
+      : cart.items.reduce((s, i) => s + (i.price * i.quantity * i.taxRate / 100), 0)
+    // EGP-per-point comes from Settings → الولاء (loyalty.egpPerPoint), not
+    // a hardcoded 0.05 — so changing it there now actually changes what a
+    // redeemed point is worth on the next sale.
+    const loyaltyDiscount = cart.loyaltyRedeem * loyaltySettings.egpPerPoint
+
+    // Fix: apply discount type correctly
+    let discountAmount = 0
+    if (cart.discountType === 'PERCENT') {
+      discountAmount = subtotal * (cart.discountAmount || 0) / 100
+    } else {
+      discountAmount = cart.discountAmount || 0
+    }
+    // Clamp: discount cannot exceed subtotal (+ tax is not discounted)
+    discountAmount = Math.min(discountAmount, subtotal)
+
+    const totalDiscount = discountAmount + loyaltyDiscount
+    const total = Math.max(0, subtotal + taxAmount - totalDiscount)
+
+    return { subtotal, taxAmount, discountAmount, loyaltyDiscount, totalDiscount, total }
+  }, [cart.items, cart.discountAmount, cart.discountType, cart.loyaltyRedeem, cart.taxExempt, taxEnabled, loyaltySettings.egpPerPoint])
+
+  const { subtotal, taxAmount, totalDiscount, total } = calcTotals()
+
+  const handleHold = () => {
+    if (cart.items.length === 0) { toast.error('السلة فارغة'); return }
+    cart.holdSale()
+    toast.success('تم تعليق الفاتورة')
+  }
+
+  const handleCompleteSale = async (paymentData: PaymentPayload) => {
+    // Use the SAME calcTotals — no duplication, no drift
+    const { subtotal, taxAmount, totalDiscount, total } = calcTotals()
+
+    // Build sale object with items (for receipt)
+    const saleData = {
+      invoiceNumber: `INV-${Date.now()}`,
+      customerId: cart.customerId,
+      customer: cart.customerName ? { name: cart.customerName } : null,
+      user: { name: user?.name || 'المستخدم' },
+      items: cart.items.map(i => ({
+        product: { nameAr: i.nameAr, name: i.name },
+        quantity: i.quantity,
+        unitPrice: i.price,
+        total: i.price * i.quantity,
+      })),
+      subtotal,
+      discountAmount: totalDiscount,
+      taxAmount,
+      total,
+      paidAmount: paymentData.paid || total,
+      changeAmount: Math.max(0, (paymentData.paid || total) - total),
+      paymentMethod: paymentData.method,
+      loyaltyEarned: cart.customerId ? Math.floor(total / 10) : 0,
+      createdAt: new Date().toISOString(),
+    }
+
+    // Generate a stable clientTxnId BEFORE the network call so that
+    // retries (network failures, timeouts) hit the server's idempotency
+    // cache (X-Client-Txn-Id header lookup) and return the original sale
+    // instead of creating a duplicate. Also threaded into the body so the
+    // desktop SQLite handler (handleCreateSale) propagates the same id to
+    // stock_movements / loyalty_transactions / cash_movements / sync_queue.
+    const clientTxnId = generateUUID()
+
+    try {
+      // apiFetch routes to SQLite in desktop, API in web
+      const sale = await apiFetch('/sales', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Txn-Id': clientTxnId,
+        },
+        body: JSON.stringify({
+          // FIX: pointsRedeemed was never sent, so the API (which prices
+          // "pointsRedeemed" lines at 0 and prices everything else at the
+          // product's real sellingPrice) always fell into the second case
+          // — a points item that was already paid for in points got
+          // charged its FULL cash price again on top. Every points line
+          // now tells the server it was already settled in points.
+          items: cart.items.map(i => ({ productId: i.productId, quantity: i.quantity, pointsRedeemed: !!i.isPointsItem })),
+          customerId: cart.customerId,
+          userId: user?.id,
+          // Send the COMPUTED discount (fixed EGP), not the raw input.
+          // The server's handleCreateSale expects a fixed amount.
+          discountAmount: totalDiscount,
+          discountType: cart.discountType,
+          subtotal,
+          taxAmount,
+          taxExempt: cart.taxExempt,
+          total,
+          paymentMethod: paymentData.method,
+          paymentDetails: paymentData.details,
+          paidAmount: paymentData.paid,
+          note: cart.note,
+          loyaltyRedeem: cart.loyaltyRedeem,
+          clientTxnId,
+        })
+      })
+      // The server persists each SaleItem against the real product record
+      // (product.nameAr), so the "(بالنقاط)" tag added client-side above
+      // gets lost the moment we display sale.items instead of
+      // saleData.items — the printed receipt would show a plain product
+      // at ٠ ج.م with no indication it was a points redemption. Re-apply
+      // the tag by matching back against the cart lines we just sent.
+      const pointsProductIds = new Set(cart.items.filter(i => i.isPointsItem).map(i => i.productId))
+      const taggedItems = (sale.items || saleData.items || []).map((it) => {
+        if (!pointsProductIds.has(it.productId) && !pointsProductIds.has(it.product?.id)) return it
+        const baseName = it.product?.nameAr || it.product?.name || ''
+        if (baseName.includes('(بالنقاط)')) return it
+        return { ...it, product: { ...it.product, nameAr: `${baseName} (بالنقاط)` } }
+      })
+      setLastSale({ ...saleData, ...sale, items: taggedItems })
+      cart.clearCart()
+      setPaymentOpen(false)
+      toast.success(`تمت الفاتورة: ${sale.invoiceNumber}`)
+      loadData()
+      checkRegisterStatus()
+    } catch (e) {
+      notifyError(e, { context: 'إتمام عملية البيع' })
+    }
+  }
+
+  return (
+    <div className="pos-workspace flex flex-col md:flex-row h-screen">
+      {/* LEFT: Products */}
+      <div className="flex-1 flex flex-col min-w-0 p-3 md:p-4 gap-3 min-h-0">
+        {/* Search & barcode */}
+        <div className="pos-toolbar flex items-center gap-2.5">
+          <div className="relative flex-1">
+            <ScanLine className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-primary pointer-events-none" />
+            <Input
+              ref={searchRef}
+              placeholder="امسح الباركود أو ابحث عن منتج... (F2)"
+              className="pr-11 pl-20 h-12 text-sm md:text-base rounded-2xl bg-card shadow-sm border-border/80 focus-visible:ring-2 focus-visible:ring-primary/40 transition-all"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && search) {
+                  handleBarcode(search)
+                  setSearch('')
+                }
+              }}
+            />
+            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                  title="مسح البحث"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+              <kbd className="hidden sm:inline-flex items-center px-2 py-0.5 text-[10px] font-semibold text-muted-foreground bg-muted rounded-md border border-border/60">
+                F2
+              </kbd>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="lg"
+            className="h-12 px-4 rounded-2xl shadow-sm border-border/80 bg-card hover:border-primary/50 hover:bg-primary/5 gap-2 transition-all"
+            onClick={() => setHeldOpen(true)}
+          >
+            <Pause className="w-4 h-4 text-amber-500" />
+            <span className="text-xs font-semibold">المعلقة</span>
+            {cart.heldSales.length > 0 && (
+              <Badge variant="secondary" className="px-1.5 py-0 text-[11px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                {cart.heldSales.length}
+              </Badge>
+            )}
+          </Button>
+        </div>
+
+        {/* Categories — horizontal snap row with edge navigation arrows */}
+        <div className="pos-cat-wrap">
+          {!catScroll.start && (
+            <button
+              type="button"
+              className="pos-cat-nav-btn side-start shadow-sm"
+              onClick={() => scrollCats('prev')}
+              aria-label="رجوع لبداية الفئات"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
+          {!catScroll.end && (
+            <button
+              type="button"
+              className="pos-cat-nav-btn side-end shadow-sm"
+              onClick={() => scrollCats('next')}
+              aria-label="فئات أكثر"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
+          <div
+            ref={catRowRef}
+            className="pos-categories-scroll no-visible-scrollbar"
+            onScroll={updateCatScroll}
+          >
+            <div className="pos-cat-row py-1">
+              <button
+                type="button"
+                className={cn(
+                  "pos-cat-pill transition-all duration-200 font-medium",
+                  activeCategory === 'all' && "shadow-sm scale-[1.02]"
+                )}
+                data-active={activeCategory === 'all'}
+                onClick={() => setActiveCategory('all')}
+                aria-pressed={activeCategory === 'all'}
+              >
+                الكل
+              </button>
+              {categories.map(c => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={cn(
+                    "pos-cat-pill transition-all duration-200 font-medium",
+                    activeCategory === c.id && "shadow-sm scale-[1.02]"
+                  )}
+                  data-active={activeCategory === c.id}
+                  onClick={() => setActiveCategory(c.id)}
+                  aria-pressed={activeCategory === c.id}
+                >
+                  {c.nameAr || c.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Products grid — min-h-0 keeps this ScrollArea bounded to the
+            remaining space instead of growing to fit every product card,
+            which is what was pushing the grid past the bottom of the screen. */}
+        <div className="pos-products-viewport flex-1 min-h-0">
+          <div className="grid grid-cols-[repeat(auto-fill,120px)] justify-start content-start gap-2 p-1">
+            {pagedProducts.map(p => {
+              const inCart = cart.items.find(i => i.productId === p.id)
+              return (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  inCartCount={inCart?.quantity || 0}
+                  campaignBonus={campaignBonusByProduct[p.id]}
+                  pointsRequired={pointsProductsByProduct[p.id]}
+                  onAddToCart={addToCart}
+                  onRedeemPoints={setRedeemProductTarget}
+                />
+              )
+            })}
+          </div>
+          {totalProductPages > 1 && (
+            <div className="pos-products-pagination" aria-label="تنقل المنتجات">
+              <span className="text-xs text-muted-foreground pos-number">
+                صفحة {safeProductPage + 1} من {totalProductPages}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  aria-label="الصفحة التالية"
+                  disabled={safeProductPage >= totalProductPages - 1}
+                  onClick={() => setProductPage(page => Math.min(totalProductPages - 1, page + 1))}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  aria-label="الصفحة السابقة"
+                  disabled={safeProductPage <= 0}
+                  onClick={() => setProductPage(page => Math.max(0, page - 1))}
+                >
+                  <ChevronLeft className="w-4 h-4 rotate-180" />
+                </Button>
+              </div>
+            </div>
+          )}
+          {filteredProducts.length === 0 && !loading && (
+            <div className="text-center py-20 text-muted-foreground">
+              <Search className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>لا توجد منتجات</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* RIGHT: Cart — branded with purple/teal gradient accents
+          Desktop (md+): fixed 420px side panel
+          Mobile (<md): hidden, replaced by floating button + Sheet drawer */}
+      <div className="hidden md:flex w-[420px] shrink-0 border-r border-border/80 bg-card flex-col shadow-[0_0_30px_-24px_rgba(22,0,41,.45)]">
+        {/* Cart header — gradient accent */}
+        <div className="bg-brand-gradient p-4 text-primary-foreground">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-primary-foreground/15 flex items-center justify-center">
+                <ShoppingCart className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <h2 className="font-bold text-base md:text-lg">الفاتورة الحالية</h2>
+              {cart.items.length > 0 && (
+                <Badge className="bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30 border-0 text-xs px-2 py-0.5 font-bold">
+                  {cart.items.reduce((sum, item) => sum + item.quantity, 0)} قطعة
+                </Badge>
+              )}
+            </div>
+            {cart.items.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => clearCartRefundingPoints()}
+                className="text-primary-foreground/90 hover:text-white hover:bg-red-500/30 h-8 px-2.5 rounded-lg text-xs gap-1 transition-colors"
+                title="إفراغ السلة بالكامل"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                مسح
+              </Button>
+            )}
+          </div>
+
+          {/* Customer button */}
+          <div className="relative">
+            <Button
+              variant={cart.customerId ? 'secondary' : 'outline'}
+              className={cn(
+                "w-full justify-start h-11 rounded-xl text-xs sm:text-sm font-medium transition-all",
+                cart.customerId
+                  ? "bg-background text-foreground hover:bg-background/90 shadow-sm border-0"
+                  : "bg-primary-foreground/15 border-primary-foreground/25 text-primary-foreground hover:bg-primary-foreground/25"
+              )}
+              onClick={() => setCustomerOpen(true)}
+            >
+              <User className="w-4 h-4 ml-2 shrink-0" />
+              {cart.customerName ? (
+                <div className="flex items-center justify-between w-full overflow-hidden">
+                  <span className="font-bold truncate">{cart.customerName}</span>
+                  <Badge className="mr-auto bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 font-semibold text-[11px] px-2 py-0.5">
+                    {cart.loyaltyPoints} نقطة
+                  </Badge>
+                </div>
+              ) : (
+                <span className="text-primary-foreground/80">إضافة عميل (اختياري) — F3</span>
+              )}
+            </Button>
+            {cart.customerId && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  cart.setCustomer(null, '', 0)
+                }}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
+                title="إزالة العميل"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Loyalty redemption */}
+          {loyaltySettings.enabled && cart.customerId && cart.loyaltyPoints > 0 && (
+            <div className="mt-2.5 pt-2.5 border-t border-primary-foreground/20">
+              <LoyaltyRedeemControl
+                availablePoints={cart.loyaltyPoints}
+                redeemPoints={cart.loyaltyRedeem}
+                minRedeem={loyaltySettings.minRedeem}
+                egpPerPoint={loyaltySettings.egpPerPoint}
+                onChange={setLoyaltyRedeem}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Cart items */}
+        <ScrollArea className="flex-1 min-h-0 bg-muted/10">
+          <div className="p-3 space-y-2">
+            {cart.items.length === 0 ? (
+              <div className="text-center py-16 px-4 text-muted-foreground">
+                <div className="w-16 h-16 rounded-full bg-muted/60 flex items-center justify-center mx-auto mb-3 text-muted-foreground/60">
+                  <ShoppingCart className="w-8 h-8" />
+                </div>
+                <p className="font-semibold text-foreground text-sm">السلة فارغة</p>
+                <p className="text-xs text-muted-foreground mt-1">اختر المنتجات أو امسح الباركود لإضافتها إلى الفاتورة</p>
+              </div>
+            ) : (
+              cart.items.map(item => (
+                <div
+                  key={item.productId}
+                  className="bg-card rounded-xl p-3 border border-border/70 hover:border-primary/40 shadow-xs transition-all duration-150"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold truncate text-foreground">
+                        {item.nameAr || item.name}
+                      </p>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground pos-number mt-0.5">
+                        <span className="font-medium text-foreground/80">{formatEGP(item.price)}</span>
+                        <span>×</span>
+                        <span>{item.quantity}</span>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                      onClick={() => removePointsAwareItem(item)}
+                      title="حذف من الفاتورة"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/40">
+                    <div className="flex items-center bg-muted/60 rounded-lg border border-border/80 p-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-md hover:bg-background hover:text-primary transition-all"
+                        onClick={() => item.isPointsItem ? decrementPointsItem(item) : cart.updateQuantity(item.productId, item.quantity - 1)}
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </Button>
+                      <Input
+                        className="h-7 w-11 text-center pos-number border-0 px-0 font-bold bg-transparent shadow-none focus-visible:ring-0 text-xs sm:text-sm"
+                        value={item.quantity}
+                        readOnly={!!item.isPointsItem}
+                        onChange={(e) => {
+                          if (item.isPointsItem) return
+                          const qty = parseInt(e.target.value) || 0
+                          cart.updateQuantity(item.productId, qty)
+                        }}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-md hover:bg-background hover:text-primary transition-all"
+                        disabled={item.isPointsItem && (loyaltyPoints || 0) < (item.pointsCost || 0)}
+                        title={item.isPointsItem ? `تضيف وحدة أخرى مقابل ${item.pointsCost} نقطة` : undefined}
+                        onClick={() => item.isPointsItem ? incrementPointsItem(item) : cart.updateQuantity(item.productId, item.quantity + 1)}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                    <span className="text-sm font-extrabold pos-number text-primary">
+                      {item.isPointsItem ? `${(item.pointsCost || 0) * item.quantity} نقطة` : formatEGP(item.price * item.quantity)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+
+        {/* Summary & actions — branded */}
+        <div className="pos-cart-footer border-t border-border/80 bg-background/95 p-4 space-y-3.5 shrink-0 shadow-lg">
+          <div className="space-y-2 text-sm bg-muted/20 p-3 rounded-xl border border-border/60">
+            <div className="flex justify-between text-muted-foreground text-xs sm:text-sm">
+              <span>المجموع الفرعي</span>
+              <span className="pos-number font-semibold text-foreground">{formatEGP(subtotal)}</span>
+            </div>
+            <div className="flex justify-between items-center text-muted-foreground text-xs sm:text-sm">
+              <button
+                type="button"
+                disabled={!taxEnabled}
+                onClick={() => taxEnabled && setTaxExempt(!cart.taxExempt)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded transition-colors",
+                  cart.taxExempt ? "text-destructive font-medium" : "hover:text-foreground",
+                  !taxEnabled && "cursor-default"
+                )}
+                title={!taxEnabled ? "الضريبة موقوفة من الإعدادات لكل الفواتير" : cart.taxExempt ? "الضريبة معطّلة لهذه الفاتورة — اضغط للتفعيل" : "اضغط لتعطيل الضريبة على هذه الفاتورة"}
+              >
+                <span>الضريبة (14%)</span>
+                {!taxEnabled ? (
+                  <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">موقوفة</Badge>
+                ) : cart.taxExempt && (
+                  <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 font-bold">معطّلة</Badge>
+                )}
+              </button>
+              <span className={cn("pos-number font-semibold", cart.taxExempt && "line-through text-destructive")}>{formatEGP(taxAmount)}</span>
+            </div>
+            {totalDiscount > 0 && (
+              <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold text-xs sm:text-sm">
+                <span>
+                  الخصم
+                  {cart.discountType === 'PERCENT' && ` (${cart.discountAmount}%)`}
+                  {cart.loyaltyRedeem > 0 && ` + ${cart.loyaltyRedeem} نقطة`}
+                </span>
+                <span className="pos-number">- {formatEGP(totalDiscount)}</span>
+              </div>
+            )}
+            <Separator className="my-1.5" />
+            <div className="flex justify-between items-baseline pt-0.5">
+              <span className="text-base font-bold text-foreground">الإجمالي المطلوب</span>
+              <span className="pos-number text-2xl font-black text-primary tracking-tight">{formatEGP(total)}</span>
+            </div>
+          </div>
+
+          {/* Quick action buttons — branded icons */}
+          <div className="grid grid-cols-4 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-12 flex-col text-[10px] gap-0.5 rounded-xl border-border/80 hover:border-primary/50 hover:bg-primary/5 hover:text-primary transition-all"
+              onClick={() => setDiscountOpen(true)}
+              disabled={cart.items.length === 0}
+            >
+              <Tag className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>خصم</span>
+              <kbd className="text-[9px] px-1 py-0 bg-muted rounded font-mono text-muted-foreground border">F4</kbd>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-12 flex-col text-[10px] gap-0.5 rounded-xl border-border/80 hover:border-amber-500/50 hover:bg-amber-500/5 hover:text-amber-600 transition-all"
+              onClick={handleHold}
+              disabled={cart.items.length === 0}
+            >
+              <Pause className="w-4 h-4 text-amber-500" />
+              <span>تعليق</span>
+              <kbd className="text-[9px] px-1 py-0 bg-muted rounded font-mono text-muted-foreground border">F5</kbd>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-12 flex-col text-[10px] gap-0.5 rounded-xl border-border/80 hover:border-cyan-500/50 hover:bg-cyan-500/5 hover:text-cyan-600 transition-all"
+              onClick={() => setHeldOpen(true)}
+            >
+              <Play className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+              <span>استرجاع</span>
+              <kbd className="text-[9px] px-1 py-0 bg-muted rounded font-mono text-muted-foreground border">F6</kbd>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-12 flex-col text-[10px] gap-0.5 rounded-xl border-border/80 hover:border-primary/50 hover:bg-primary/5 hover:text-primary transition-all"
+              onClick={() => setCustomerOpen(true)}
+            >
+              <User className="w-4 h-4 text-primary" />
+              <span>عميل</span>
+              <kbd className="text-[9px] px-1 py-0 bg-muted rounded font-mono text-muted-foreground border">F3</kbd>
+            </Button>
+          </div>
+
+          {/* Checkout button */}
+          <Button
+            size="lg"
+            className="w-full h-15 text-base md:text-lg font-bold rounded-2xl bg-brand-gradient hover:opacity-95 active:scale-[0.99] shadow-lg hover:shadow-primary/30 transition-all duration-200 flex items-center justify-between px-5"
+            disabled={cart.items.length === 0 || registerOpen === false}
+            onClick={startCheckout}
+          >
+            <div className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5 ml-1" />
+              <span>{registerOpen === false ? 'الخزنة مقفولة — افتحها الأول' : 'الدفع وإتمام البيع'}</span>
+            </div>
+            {registerOpen !== false && cart.items.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold pos-number text-lg">{formatEGP(total)}</span>
+                <span className="kbd bg-primary-foreground/20 border-primary-foreground/30 text-primary-foreground text-xs px-1.5 py-0.5 rounded">F8</span>
+              </div>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* ─── MOBILE: Floating cart button + Sheet drawer ───
+          On mobile (<md), the cart panel above is hidden (hidden md:flex).
+          This floating button shows item count + total, and opens a Sheet
+          with the full cart UI so cashiers on tablets/phones can still
+          complete sales. */}
+      <div className="md:hidden">
+        <Sheet open={cartSheetOpen} onOpenChange={setCartSheetOpen}>
+          <SheetTrigger asChild>
+            <button
+              className="fixed bottom-4 left-4 right-4 z-40 flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-brand-gradient text-primary-foreground shadow-2xl shadow-primary/40 active:scale-[0.98] transition-transform"
+              aria-label={`عرض السلة — ${cart.items.length} صنف`}
+            >
+              <div className="relative">
+                <ShoppingCart className="w-6 h-6" />
+                {cart.items.length > 0 && (
+                  <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-brand-gold text-[10px] font-bold flex items-center justify-center text-primary-foreground">
+                    {cart.items.length}
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 text-right">
+                <p className="text-xs opacity-90">
+                  {cart.items.length === 0 ? 'السلة فارغة' : `${cart.items.length} صنف`}
+                </p>
+                <p className="text-lg font-bold pos-number">{formatEGP(total)}</p>
+              </div>
+              {cart.items.length > 0 && (
+                <span className="text-xs font-bold bg-primary-foreground/20 px-3 py-1 rounded-lg">
+                  دفع ←
+                </span>
+              )}
+            </button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="h-[85vh] p-0">
+            {/* Mobile cart header */}
+            <div className="bg-brand-gradient p-4 text-primary-foreground">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-bold flex items-center gap-2 text-lg">
+                  <ShoppingCart className="w-5 h-5" />
+                  الفاتورة الحالية
+                </h2>
+                {cart.items.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={() => clearCartRefundingPoints()} className="text-primary-foreground hover:bg-primary-foreground/20">
+                    <Trash2 className="w-4 h-4 ml-1" />
+                    مسح
+                  </Button>
+                )}
+              </div>
+              <Button
+                variant={cart.customerId ? 'secondary' : 'outline'}
+                className="w-full justify-start h-11 bg-primary-foreground/15 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/25"
+                onClick={() => { setCustomerOpen(true) }}
+              >
+                <User className="w-4 h-4 ml-2" />
+                {cart.customerName ? (
+                  <>
+                    <span className="font-medium">{cart.customerName}</span>
+                    <Badge className="mr-auto bg-brand-gold text-primary-foreground">
+                      {cart.loyaltyPoints} نقطة
+                    </Badge>
+                  </>
+                ) : (
+                  <span className="text-primary-foreground/80">إضافة عميل (اختياري) — F3</span>
+                )}
+              </Button>
+              {loyaltySettings.enabled && cart.customerId && cart.loyaltyPoints > 0 && (
+                <div className="mt-2">
+                  <LoyaltyRedeemControl
+                    availablePoints={cart.loyaltyPoints}
+                    redeemPoints={cart.loyaltyRedeem}
+                    minRedeem={loyaltySettings.minRedeem}
+                    egpPerPoint={loyaltySettings.egpPerPoint}
+                    onChange={setLoyaltyRedeem}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Mobile cart items */}
+            <ScrollArea className="flex-1 h-[40vh]">
+              <div className="p-3 space-y-2">
+                {cart.items.length === 0 ? (
+                  <div className="text-center py-16 text-muted-foreground">
+                    <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium">السلة فارغة</p>
+                    <p className="text-xs mt-1">امسح الباركود أو اضغط على منتج</p>
+                  </div>
+                ) : (
+                  cart.items.map(item => (
+                    <div key={item.productId} className="bg-muted/30 rounded-xl p-3 border border-border/50">
+                      <div className="flex items-start gap-2 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{item.nameAr || item.name}</p>
+                          <p className="text-xs text-muted-foreground pos-number">
+                            {formatEGP(item.price)} × {item.quantity}
+                          </p>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-destructive hover:bg-destructive/10" onClick={() => removePointsAwareItem(item)} aria-label={`حذف ${item.nameAr || item.name}`}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center bg-background rounded-lg border border-border">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-primary/10 hover:text-primary" onClick={() => item.isPointsItem ? decrementPointsItem(item) : cart.updateQuantity(item.productId, item.quantity - 1)} aria-label="تقليل الكمية">
+                            <Minus className="w-3 h-3" />
+                          </Button>
+                          <Input
+                            className="h-7 w-12 text-center pos-number border-0 px-0 font-bold"
+                            value={item.quantity}
+                            readOnly={!!item.isPointsItem}
+                            onChange={(e) => {
+                              // Points lines can only grow/shrink through
+                              // incrementPointsItem/decrementPointsItem,
+                              // which re-deduct/refund points per unit —
+                              // typing a number here would skip that check.
+                              if (item.isPointsItem) return
+                              const qty = parseInt(e.target.value) || 0
+                              cart.updateQuantity(item.productId, qty)
+                            }}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 hover:bg-primary/10 hover:text-primary"
+                            disabled={item.isPointsItem && (loyaltyPoints || 0) < (item.pointsCost || 0)}
+                            title={item.isPointsItem ? `تضيف وحدة أخرى مقابل ${item.pointsCost} نقطة` : undefined}
+                            onClick={() => item.isPointsItem ? incrementPointsItem(item) : cart.updateQuantity(item.productId, item.quantity + 1)}
+                            aria-label="زيادة الكمية"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        <span className="text-sm font-bold mr-auto pos-number text-primary">
+                          {formatEGP(item.price * item.quantity)}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+
+            {/* Mobile summary & checkout */}
+            <div className="pos-cart-footer border-t border-border/80 bg-background/95 p-4 space-y-3 shrink-0">
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>المجموع الفرعي</span>
+                  <span className="pos-number font-medium">{formatEGP(subtotal)}</span>
+                </div>
+                <div className="flex justify-between items-center text-muted-foreground">
+                  <button
+                    type="button"
+                    disabled={!taxEnabled}
+                    onClick={() => taxEnabled && setTaxExempt(!cart.taxExempt)}
+                    className={cn(
+                      "flex items-center gap-1 rounded transition-colors",
+                      cart.taxExempt ? "text-destructive font-medium" : "hover:text-foreground",
+                      !taxEnabled && "cursor-default"
+                    )}
+                  >
+                    <span>الضريبة (14%)</span>
+                    {!taxEnabled ? (
+                      <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">موقوفة من الإعدادات</Badge>
+                    ) : cart.taxExempt && (
+                      <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4">معطّلة</Badge>
+                    )}
+                  </button>
+                  <span className={cn("pos-number font-medium", cart.taxExempt && "line-through text-destructive")}>{formatEGP(taxAmount)}</span>
+                </div>
+                {totalDiscount > 0 && (
+                  <div className="flex justify-between text-brand-teal font-medium">
+                    <span>الخصم</span>
+                    <span className="pos-number">- {formatEGP(totalDiscount)}</span>
+                  </div>
+                )}
+                <Separator className="my-2" />
+                <div className="flex justify-between items-baseline">
+                  <span className="text-base font-bold">الإجمالي</span>
+                  <span className="pos-number text-2xl font-bold text-primary">{formatEGP(total)}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2">
+                <Button variant="outline" size="sm" className="h-12 flex-col text-[10px] gap-0.5" onClick={() => setDiscountOpen(true)} disabled={cart.items.length === 0} aria-label="خصم">
+                  <Tag className="w-4 h-4" />
+                  خصم
+                </Button>
+                <Button variant="outline" size="sm" className="h-12 flex-col text-[10px] gap-0.5" onClick={handleHold} disabled={cart.items.length === 0} aria-label="تعليق">
+                  <Pause className="w-4 h-4" />
+                  تعليق
+                </Button>
+                <Button variant="outline" size="sm" className="h-12 flex-col text-[10px] gap-0.5" onClick={() => setHeldOpen(true)} aria-label="استرجاع">
+                  <Play className="w-4 h-4" />
+                  استرجاع
+                </Button>
+                <Button variant="outline" size="sm" className="h-12 flex-col text-[10px] gap-0.5" onClick={() => setCustomerOpen(true)} aria-label="عميل">
+                  <User className="w-4 h-4" />
+                  عميل
+                </Button>
+              </div>
+
+              <Button
+                size="lg"
+                className="w-full h-14 text-lg font-bold bg-brand-gradient hover:opacity-90 shadow-lg"
+                disabled={cart.items.length === 0 || registerOpen === false}
+                onClick={() => { setCartSheetOpen(false); startCheckout() }}
+              >
+                <CreditCard className="w-6 h-6 ml-2" />
+                {registerOpen === false ? 'الخزنة مقفولة — افتحها الأول' : `تمام — دفع ${formatEGP(total)}`}
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* Checkout Customer Dialog — ask for phone before payment */}
+      <CheckoutCustomerDialog
+        open={checkoutCustomerOpen}
+        onOpenChange={setCheckoutCustomerOpen}
+        onSkip={() => { setCheckoutCustomerOpen(false); setPaymentOpen(true) }}
+        onSelected={() => { setCheckoutCustomerOpen(false); setPaymentOpen(true) }}
+      />
+
+      {/* Payment Dialog */}
+      <PaymentDialog
+        open={paymentOpen}
+        onOpenChange={setPaymentOpen}
+        total={total}
+        onComplete={handleCompleteSale}
+      />
+
+      {/* Customer Dialog */}
+      <CustomerDialog
+        open={customerOpen}
+        onOpenChange={setCustomerOpen}
+      />
+
+      {/* Discount Dialog */}
+      <DiscountDialog
+        open={discountOpen}
+        onOpenChange={setDiscountOpen}
+        subtotal={subtotal}
+      />
+
+      {/* Held Sales Dialog */}
+      <HeldSalesDialog
+        open={heldOpen}
+        onOpenChange={setHeldOpen}
+      />
+
+      {/* Receipt Print Dialog */}
+      {lastSale && (
+        <ReceiptPrint
+          sale={lastSale}
+          onClose={() => setLastSale(null)}
+        />
+      )}
+
+      {/* Redeem-product-with-points confirmation */}
+      <Dialog open={!!redeemProductTarget} onOpenChange={(v) => !v && setRedeemProductTarget(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Award className="w-5 h-5 text-amber-500" />
+              استبدال بالنقاط
+            </DialogTitle>
+            <DialogDescription>
+              {redeemProductTarget && (
+                cart.customerId
+                  ? `استبدال "${redeemProductTarget.nameAr || redeemProductTarget.name}" بـ ${pointsProductsByProduct[redeemProductTarget.id]} نقطة من رصيد ${cart.customerName || 'العميل'} (المتاح: ${loyaltyPoints || 0} نقطة)؟`
+                  : 'اختر عميل أولاً من زر "عميل" قبل استبدال منتج بالنقاط.'
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRedeemProductTarget(null)}>إلغاء</Button>
+            {cart.customerId ? (
+              <Button onClick={confirmRedeemProduct} disabled={redeemingProduct} className="bg-amber-500 hover:bg-amber-600">
+                {redeemingProduct ? 'جاري الاستبدال...' : 'تأكيد الاستبدال'}
+              </Button>
+            ) : (
+              <Button onClick={() => { setRedeemProductTarget(null); setCustomerOpen(true) }}>
+                اختيار عميل
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+// ============ PAYMENT DIALOG ============
+// Inline control for redeeming loyalty points as a discount on the current
+// cart, right in the POS screen. Was previously entirely missing — the
+// cart store and calcTotals() already supported loyaltyRedeem end-to-end,
+// but nothing in the UI could ever set it above 0.
+function LoyaltyRedeemControl({ availablePoints, redeemPoints, minRedeem, egpPerPoint, onChange }: {
+  availablePoints: number
+  redeemPoints: number
+  minRedeem: number
+  egpPerPoint: number
+  onChange: (points: number) => void
+}) {
+  const [input, setInput] = useState(redeemPoints > 0 ? String(redeemPoints) : '')
+  // Redeem gets reset to 0 externally (new customer picked, cart cleared) —
+  // clear the stale text in that case so the input doesn't show a number
+  // that's no longer actually being redeemed.
+  useEffect(() => { if (redeemPoints === 0) setInput('') }, [redeemPoints])
+  const canRedeem = availablePoints >= Math.max(1, minRedeem)
+
+  if (!canRedeem) {
+    return (
+      <div className="text-xs text-primary-foreground/70 px-1">
+        محتاج {minRedeem} نقطة على الأقل للاستبدال (متاح {availablePoints})
+      </div>
+    )
+  }
+
+  const apply = (raw: string) => {
+    setInput(raw)
+    let pts = parseInt(raw) || 0
+    if (pts < 0) pts = 0
+    if (pts > availablePoints) pts = availablePoints
+    onChange(pts)
+  }
+
+  // FIX: this used to switch to a read-only "استخدام X نقطة" summary as
+  // soon as redeemPoints > 0 — i.e. right after the FIRST digit typed —
+  // which unmounted the <Input> and made it impossible to type a second
+  // digit (typing "15" would apply "1", then swap away the field before
+  // "5" could be typed). The input now always stays mounted; the summary
+  // of the discount is shown alongside it instead of replacing it.
+  return (
+    <div className="flex items-center gap-2 bg-primary-foreground/10 border border-primary-foreground/20 rounded-md px-2 py-1">
+      <Gift className="w-4 h-4 text-primary-foreground/70 shrink-0" />
+      <Input
+        type="number"
+        placeholder={`نقاط للاستبدال (متاح ${availablePoints})`}
+        value={input}
+        min={0}
+        max={availablePoints}
+        onChange={(e) => apply(e.target.value)}
+        className="h-7 text-xs bg-transparent border-0 text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-0 px-1"
+      />
+      {redeemPoints > 0 ? (
+        <>
+          <span className="text-xs text-primary-foreground/80 shrink-0 whitespace-nowrap">
+            خصم {formatEGP(redeemPoints * egpPerPoint)}
+          </span>
+          <Button
+            variant="ghost" size="sm"
+            className="h-6 px-2 text-xs text-primary-foreground hover:bg-primary-foreground/20 shrink-0"
+            onClick={() => { setInput(''); onChange(0) }}
+          >
+            إلغاء
+          </Button>
+        </>
+      ) : (
+        <Button
+          variant="ghost" size="sm"
+          className="h-6 px-2 text-xs text-primary-foreground hover:bg-primary-foreground/20 shrink-0"
+          onClick={() => apply(String(availablePoints))}
+        >
+          الكل
+        </Button>
+      )}
+    </div>
+  )
+}
+
+function PaymentDialog({ open, onOpenChange, total, onComplete }: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  total: number
+  onComplete: (data: PaymentPayload) => void
+}) {
+  const [method, setMethod] = useState('CASH')
+  const [paidAmount, setPaidAmount] = useState('')
+  const [splitCash, setSplitCash] = useState('')
+  const [splitCard, setSplitCard] = useState('')
+  const [processing, setProcessing] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setMethod('CASH')
+      setPaidAmount(total.toFixed(2))
+      setSplitCash('')
+      setSplitCard('')
+    }
+  }, [open, total])
+
+  const paid = parseFloat(paidAmount) || 0
+  const change = Math.max(0, paid - total)
+
+  const handlePay = async () => {
+    setProcessing(true)
+    try {
+      let paymentData: PaymentPayload = { method, paid: total }
+      if (method === 'SPLIT') {
+        const cash = parseFloat(splitCash) || 0
+        const card = parseFloat(splitCard) || 0
+        if (Math.abs(cash + card - total) > 0.01) {
+          toast.error('مجموع الدفعات يجب أن يساوي الإجمالي')
+          setProcessing(false)
+          return
+        }
+        paymentData = {
+          method: 'SPLIT',
+          paid: total,
+          details: { splits: [{ method: 'CASH', amount: cash }, { method: 'CARD', amount: card }] }
+        }
+      } else if (method === 'CASH') {
+        paymentData = { method, paid: paid || total, details: { splits: [{ method: 'CASH', amount: total }] } }
+      } else {
+        paymentData = { method, paid: total, details: { splits: [{ method, amount: total }] } }
+      }
+      await onComplete(paymentData)
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const quickAmounts = [total, Math.ceil(total / 50) * 50, Math.ceil(total / 100) * 100, Math.ceil(total / 100) * 100 + 100]
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between">
+            إتمام الدفع
+            <kbd className="uk-shortcut-hint" title="اضغط Enter لإتمام الدفع">Enter — تنفيذ</kbd>
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {/* Total */}
+          <div className="text-center bg-primary/10 rounded-xl p-4">
+            <p className="text-sm text-muted-foreground">الإجمالي المطلوب</p>
+            <p className="text-3xl font-bold text-primary pos-number">{formatEGP(total)}</p>
+          </div>
+
+          {/* Payment method */}
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { m: 'CASH', label: 'نقدي', icon: Banknote },
+              { m: 'CARD', label: 'بطاقة', icon: CreditCard },
+              { m: 'TRANSFER', label: 'تحويل', icon: Wallet },
+              { m: 'SPLIT', label: 'مقسّم', icon: Percent },
+            ].map(opt => {
+              const Icon = opt.icon
+              return (
+                <Button
+                  key={opt.m}
+                  variant={method === opt.m ? 'default' : 'outline'}
+                  className="flex-col h-16 gap-1"
+                  onClick={() => setMethod(opt.m)}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="text-xs">{opt.label}</span>
+                </Button>
+              )
+            })}
+          </div>
+
+          {method === 'CASH' && (
+            <>
+              <div className="space-y-2">
+                <Label>المبلغ المدفوع</Label>
+                <Input
+                  type="number"
+                  className="text-2xl h-14 text-center pos-number font-bold"
+                  value={paidAmount}
+                  onChange={(e) => setPaidAmount(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {quickAmounts.map((amt, i) => (
+                  <Button
+                    key={i}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPaidAmount(amt.toFixed(2))}
+                    className="pos-number"
+                  >
+                    {amt.toFixed(0)}
+                  </Button>
+                ))}
+              </div>
+              <div className="bg-green-500/10 rounded-lg p-3 flex justify-between items-center">
+                <span className="text-sm text-green-700">الباقي للعميل</span>
+                <span className="text-xl font-bold text-green-700 pos-number">{formatEGP(change)}</span>
+              </div>
+            </>
+          )}
+
+          {method === 'SPLIT' && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>المبلغ نقداً</Label>
+                <Input
+                  type="number"
+                  className="h-12 pos-number"
+                  value={splitCash}
+                  onChange={(e) => setSplitCash(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>المبلغ بالبطاقة</Label>
+                <Input
+                  type="number"
+                  className="h-12 pos-number"
+                  value={splitCard}
+                  onChange={(e) => setSplitCard(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground text-center pos-number">
+                المتبقي: {formatEGP(total - (parseFloat(splitCash) || 0) - (parseFloat(splitCard) || 0))}
+              </p>
+            </div>
+          )}
+
+          {(method === 'CARD' || method === 'TRANSFER') && (
+            <div className="bg-blue-500/10 rounded-lg p-4 text-center">
+              <CreditCard className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+              <p className="text-sm">سيتم معالجة الدفع بقيمة {formatEGP(total)} عبر {method === 'CARD' ? 'البطاقة' : 'التحويل'}</p>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="ml-2">
+            إلغاء
+          </Button>
+          <Button onClick={handlePay} disabled={processing} size="lg" className="flex-1">
+            {processing ? 'جاري المعالجة...' : 'تأكيد الدفع'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============ CUSTOMER DIALOG ============
+function CustomerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const [phone, setPhone] = useState('')
+  const [search, setSearch] = useState('')
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [loading, setLoading] = useState(false)
+  const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null)
+  const [showNewForm, setShowNewForm] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const cart = useCartStore()
+
+  useEffect(() => {
+    if (open) {
+      setPhone('')
+      setSearch('')
+      setFoundCustomer(null)
+      setShowNewForm(false)
+      setNewName('')
+      loadCustomers('')
+    }
+  }, [open])
+
+  const loadCustomers = async (q: string) => {
+    setLoading(true)
+    try {
+      const data = await apiFetch(`/customers?search=${encodeURIComponent(q)}`)
+      setCustomers(data || [])
+    } catch {
+      // silent fail
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Search by phone number
+  const searchByPhone = async () => {
+    if (!phone || phone.length < 3) return
+    setLoading(true)
+    setFoundCustomer(null)
+    setShowNewForm(false)
+    try {
+      const data = await apiFetch(`/customers?search=${encodeURIComponent(phone)}`)
+      const found = (data as Customer[] | undefined)?.find((c) => c.phone === phone)
+      if (found) {
+        setFoundCustomer(found)
+      } else {
+        setShowNewForm(true)
+      }
+    } catch {
+      setShowNewForm(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const createCustomer = async () => {
+    if (!newName.trim() || !phone.trim()) return
+    setCreating(true)
+    try {
+      const data = await apiFetch('/customers', {
+        method: 'POST',
+        body: JSON.stringify({ name: newName, phone, tier: 'BRONZE' }),
+      })
+      cart.setCustomer(data.id, data.name, data.phone, 0)
+      toast.success(`تم تسجيل عميل جديد: ${data.name}`)
+      onOpenChange(false)
+    } catch (e) {
+      notifyError(e, { context: 'تسجيل عميل جديد' })
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const selectCustomer = (c: Customer) => {
+    cart.setCustomer(c.id, c.name, c.phone ?? null, c.loyaltyAccount?.points || 0)
+    toast.success(`تم اختيار: ${c.name}`)
+    onOpenChange(false)
+  }
+
+  const removeCustomer = () => {
+    cart.setCustomer(null, null, null, 0)
+    onOpenChange(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>عميل الفاتورة</DialogTitle>
+          <DialogDescription>اختر عميل قائم بالاسم أو الهاتف، أو أضف عميل جديد بسرعة — اختياري لإتمام البيع.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          {/* Phone search */}
+          <div className="space-y-2">
+            <Label>رقم هاتف العميل</Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="010xxxxxxxx"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && searchByPhone()}
+                autoFocus
+                className="text-lg"
+                dir="ltr"
+              />
+              <Button onClick={searchByPhone} disabled={loading || phone.length < 3}>
+                <Search className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Found customer */}
+          {foundCustomer && (
+            <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-green-600 font-bold">
+                  {foundCustomer.name?.charAt(0) || '?'}
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold">{foundCustomer.name}</p>
+                  <p className="text-sm text-muted-foreground">{foundCustomer.phone}</p>
+                  {foundCustomer.loyaltyAccount && (
+                    <Badge variant="secondary" className="mt-1">
+                      <Gift className="w-3 h-3 ml-1" />
+                      {foundCustomer.loyaltyAccount.points} نقطة
+                    </Badge>
+                  )}
+                </div>
+                <Button size="sm" onClick={() => selectCustomer(foundCustomer)}>
+                  اختيار
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* New customer form */}
+          {showNewForm && !foundCustomer && (
+            <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-3">
+              <p className="text-sm text-amber-700 font-medium">
+                رقم غير مسجل - سجل عميل جديد
+              </p>
+              <div className="space-y-2">
+                <Label>الاسم</Label>
+                <Input
+                  placeholder="اسم العميل"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && createCustomer()}
+                  autoFocus
+                />
+              </div>
+              <Button
+                className="w-full"
+                onClick={createCustomer}
+                disabled={creating || !newName.trim()}
+              >
+                {creating ? 'جاري التسجيل...' : 'تسجيل العميل'}
+              </Button>
+            </div>
+          )}
+
+          {/* Divider */}
+          <div className="relative py-1">
+            <Separator />
+            <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-2 text-xs text-muted-foreground">
+              أو ابحث بالاسم
+            </span>
+          </div>
+
+          {/* Name search */}
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              className="pr-9"
+              placeholder="ابحث بالاسم..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                loadCustomers(e.target.value)
+              }}
+            />
+          </div>
+
+          {/* Customer list */}
+          <ScrollArea className="h-48">
+            <div className="space-y-1">
+              {customers.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => selectCustomer(c)}
+                  className="w-full text-right p-2 rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
+                >
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0 text-sm">
+                    {c.name?.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{c.name}</p>
+                    <p className="text-xs text-muted-foreground">{c.phone}</p>
+                  </div>
+                  {c.loyaltyAccount && (
+                    <Badge variant="secondary" className="shrink-0 text-[10px]">
+                      {c.loyaltyAccount.points}
+                    </Badge>
+                  )}
+                </button>
+              ))}
+              {customers.length === 0 && !loading && (
+                <p className="text-center text-muted-foreground py-4 text-sm">لا يوجد عملاء</p>
+              )}
+            </div>
+          </ScrollArea>
+
+          {cart.customerId && (
+            <Button variant="outline" className="w-full" onClick={removeCustomer}>
+              <X className="w-4 h-4 ml-2" />
+              إزالة: {cart.customerName}
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============ DISCOUNT DIALOG ============
+function DiscountDialog({ open, onOpenChange, subtotal }: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  subtotal: number
+}) {
+  const [type, setType] = useState<'FIXED' | 'PERCENT'>('FIXED')
+  const [value, setValue] = useState('')
+  const cart = useCartStore()
+
+  useEffect(() => {
+    if (open) {
+      setType(cart.discountType || 'FIXED')
+      setValue(cart.discountAmount?.toString() || '')
+    }
+  }, [open])
+
+  const apply = () => {
+    const v = parseFloat(value) || 0
+    if (type === 'PERCENT' && v > 100) {
+      toast.error('نسبة الخصم لا يمكن أن تتجاوز 100%')
+      return
+    }
+    if (type === 'FIXED' && v > subtotal) {
+      toast.error('الخصم لا يمكن أن يتجاوز المجموع')
+      return
+    }
+    cart.setDiscount(v, type)
+    toast.success('تم تطبيق الخصم')
+    onOpenChange(false)
+  }
+
+  const remove = () => {
+    cart.setDiscount(0, 'FIXED')
+    onOpenChange(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between">
+            تطبيق خصم
+            <kbd className="uk-shortcut-hint" title="اضغط Enter للتطبيق">Enter — تطبيق</kbd>
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant={type === 'FIXED' ? 'default' : 'outline'}
+              onClick={() => setType('FIXED')}
+            >
+              مبلغ ثابت
+            </Button>
+            <Button
+              variant={type === 'PERCENT' ? 'default' : 'outline'}
+              onClick={() => setType('PERCENT')}
+            >
+              نسبة مئوية %
+            </Button>
+          </div>
+          <div className="space-y-2">
+            <Label>قيمة الخصم {type === 'PERCENT' ? '(%)' : '(ج.م)'}</Label>
+            <Input
+              type="number"
+              className="h-12 text-lg pos-number"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              autoFocus
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={remove} className="ml-2">إزالة</Button>
+          <Button onClick={apply} className="flex-1">تطبيق</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============ HELD SALES DIALOG ============
+function HeldSalesDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const cart = useCartStore()
+  const [heldSales, setHeldSales] = useState<CartState['heldSales']>([])
+
+  useEffect(() => {
+    setHeldSales(cart.heldSales)
+  }, [open, cart.heldSales])
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>الفواتير المعلقة ({heldSales.length})</DialogTitle>
+          <DialogDescription>الفواتير المعلقة محفوظة على هذا الجهاز — استرجعها لإكمال البيع في أي وقت.</DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="max-h-96">
+          <div className="space-y-2">
+            {heldSales.map((sale, i) => {
+              const total = sale.items.reduce((s, it) => s + it.price * it.quantity, 0)
+              return (
+                <div key={i} className="border rounded-lg p-3 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{sale.customerName || 'عميل نقدي'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {sale.items.length} أصناف • {formatEGP(total)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(sale.timestamp).toLocaleString('ar-EG')}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      cart.retrieveHeldSale(i)
+                      onOpenChange(false)
+                      toast.success('تم استرجاع الفاتورة')
+                    }}
+                  >
+                    <Play className="w-4 h-4 ml-1" />
+                    استرجاع
+                  </Button>
+                </div>
+              )
+            })}
+            {heldSales.length === 0 && (
+              <p className="text-center text-muted-foreground py-8">لا توجد فواتير معلقة</p>
+            )}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============================================================
+// CHECKOUT CUSTOMER DIALOG — streamlined phone entry at checkout
+// ============================================================
+// Flow:
+//   1. User clicks "تمام — دفع" with no customer selected
+//   2. This dialog asks: "هل تريد إضافة عميل؟"
+//   3. User enters phone number:
+//      - If found → select customer, proceed to payment (onSelected)
+//      - If not found → ask for name → create customer → proceed (onSelected)
+//   4. Or user clicks "تخطي" → proceed without customer (onSkip)
+// ============================================================
+function CheckoutCustomerDialog({ open, onOpenChange, onSkip, onSelected }: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onSkip: () => void
+  onSelected: () => void
+}) {
+  const [phone, setPhone] = useState('')
+  const [name, setName] = useState('')
+  const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const cart = useCartStore()
+
+  useEffect(() => {
+    if (open) {
+      setPhone('')
+      setName('')
+      setFoundCustomer(null)
+      setSearching(false)
+      setCreating(false)
+    }
+  }, [open])
+
+  // Look up customer by phone
+  const handleLookup = async () => {
+    const p = phone.trim()
+    if (!p || p.length < 6) {
+      toast.error('أدخل رقم هاتف صحيح')
+      return
+    }
+    setSearching(true)
+    try {
+      const res = await apiFetch(`/customers?search=${encodeURIComponent(p)}&limit=5`)
+      const customers = (Array.isArray(res) ? res : (res as { data?: Customer[] })?.data || []) as Customer[]
+      const exact = customers.find((c) => c.phone === p)
+      if (exact) {
+        // Found — select and proceed
+        cart.setCustomer(exact.id, exact.name, exact.phone ?? null, exact.loyaltyPoints || 0)
+        toast.success(`تم اختيار العميل: ${exact.name}`)
+        onSelected()
+      } else {
+        // Not found — ask for name to create new
+        setFoundCustomer({ notFound: true } as unknown as Customer)
+        toast.info('العميل غير موجود — أدخل الاسم لإنشاء عميل جديد')
+      }
+    } catch {
+      toast.error('فشل البحث عن العميل')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  // Create new customer then proceed
+  const handleCreate = async () => {
+    const n = name.trim()
+    if (!n) {
+      toast.error('أدخل اسم العميل')
+      return
+    }
+    setCreating(true)
+    try {
+      const res = await apiFetch('/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: n, phone: phone.trim(), tier: 'BRONZE' }),
+      })
+      if (res?.id) {
+        cart.setCustomer(res.id, res.name, res.phone, 0)
+        toast.success(`تم إنشاء العميل: ${res.name}`)
+        onSelected()
+      }
+    } catch {
+      toast.error('فشل إنشاء العميل')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <User className="w-5 h-5 text-primary" />
+            إضافة عميل للفاتورة
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            اختياري — يمكنك تخطي هذه الخطوة وإتمام البيع بدون عميل
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          {!foundCustomer ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="checkout-phone">رقم هاتف العميل</Label>
+                <Input
+                  id="checkout-phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleLookup()}
+                  placeholder="01xxxxxxxxx"
+                  className="pos-number text-lg"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 h-11"
+                  onClick={handleLookup}
+                  disabled={searching || !phone.trim()}
+                >
+                  {searching ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : <Search className="w-4 h-4 ml-2" />}
+                  بحث
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 h-11"
+                  onClick={onSkip}
+                >
+                  تخطي — بيع بدون عميل
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/30 text-sm">
+                <p className="font-medium text-amber-700">رقم الهاتف غير مسجل</p>
+                <p className="text-xs text-muted-foreground mt-1">أدخل اسم العميل لإنشاء حساب جديد، أو تخطى</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="checkout-name">اسم العميل</Label>
+                <Input
+                  id="checkout-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                  placeholder="اسم العميل الجديد"
+                  className="text-lg"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 h-11"
+                  onClick={handleCreate}
+                  disabled={creating || !name.trim()}
+                >
+                  {creating ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : <UserPlus className="w-4 h-4 ml-2" />}
+                  إنشاء وإضافة
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-11"
+                  onClick={() => { setFoundCustomer(null); setName('') }}
+                >
+                  رجوع
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onSkip} className="w-full">
+            متابعة بدون عميل
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
